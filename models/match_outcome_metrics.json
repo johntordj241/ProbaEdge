@@ -1,0 +1,9 @@
+{
+  "status": "skipped",
+  "reason": "Insufficient class diversity",
+  "samples": 2,
+  "class_distribution": {
+    "home": 2
+  },
+  "generated_at": "2025-10-25T14:11:03.414720+00:00"
+}

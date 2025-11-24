@@ -1,0 +1,111 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 2 /Kids [3 0 R 4 0 R] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Contents 4 0 R /Resources << /Font << /F1  5 0 R /F2 6 0 R >> >> >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Contents 6 0 R /Resources << /Font << /F1  7 0 R /F2 8 0 R >> >> >>
+endobj
+5 0 obj
+<< /Length 3920 >>
+stream
+BT /F2 16.0 Tf 1 0 0 1 48.00 765.89 Tm (Rapport d'audit Proba Edge - 15/11/2025) Tj ET
+BT /F2 14.0 Tf 1 0 0 1 48.00 736.89 Tm (Resume executif) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 720.89 Tm (- L'application Streamlit couvre 21 pages actives, reliees aux modules utilitaires sous) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 704.89 Tm (    `utils/`.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 688.89 Tm (- Le moteur multi-couches \(Poisson + Dixon-Coles + Markov + calibration ML\) alimente les) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 672.89 Tm (    pages Predictions, Dashboard et IA.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 656.89 Tm (- La supervision \(cache, quotas, mode hors ligne\) est operationnelle via) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 640.89 Tm (    `utils/cache.py` et `utils/supervision.py`.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 624.89 Tm (- Aucun Social Engine n'est code pour l'instant : pas de connecteurs reseaux sociaux ni) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 608.89 Tm (    d'automatisations Make/Supabase.) Tj ET
+BT /F2 14.0 Tf 1 0 0 1 48.00 579.89 Tm (Modules existants) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 48.00 559.89 Tm (Moteur probabiliste) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 543.89 Tm (- `utils/prediction_model.py` orchestre Poisson, Markov, calibration scikit-learn et) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 527.89 Tm (    resume editorial.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 511.89 Tm (- `models/ratings.py`, `models/goal_models.py`, `models/markov.py` stockent Elo,) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 495.89 Tm (    matrices Dixon-Coles et Markov live.) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 48.00 470.89 Tm (Historique & datasets) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 454.89 Tm (- `utils/prediction_history.py` gere le CSV `data/prediction_history.csv` et l'export) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 438.89 Tm (    dataset ML.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 422.89 Tm (- `scripts/backfill_predictions.py` et `scripts/train_prediction_model.py` assurent) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 406.89 Tm (    collecte et entrainement.) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 48.00 381.89 Tm (Supervision & cache) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 365.89 Tm (- `utils/cache.py`, `utils/supervision.py` et la page Supervision gerent offline, quotas) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 349.89 Tm (    et purge.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 333.89 Tm (- Scripts support : `scripts/cache_maintenance.py`, `scripts/check_recovery.py`,) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 317.89 Tm (    `scripts/export_supervision_metrics.py`.) Tj ET
+BT /F2 12.0 Tf 1 0 0 1 48.00 292.89 Tm (Profil & bookmakers) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 276.89 Tm (- `utils/profile.py` + `utils/profile_ui.py` stockent bankroll, preferences ligues et) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 260.89 Tm (    alias bookmakers.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 244.89 Tm (- `utils/match_filter.py` et `utils/analytics_ui.py` consolident edges par bookmaker.) Tj ET
+BT /F2 14.0 Tf 1 0 0 1 48.00 215.89 Tm (Pages existantes) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 199.89 Tm (1. Pilotage : Dashboard, Roadmap, Guides, Admin.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 183.89 Tm (2. Analyse match/joueur : Matchs, Statistiques, Classement, Joueurs, Buteurs, Passeurs,) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 167.89 Tm (Cartons, Stades, H2H.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 151.89 Tm (3. Paris & IA : Predictions, Bookmakers, Cotes, Performance IA, Tableau IA.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 135.89 Tm (4. Maintenance : Profil, Historique, Supervision, Tester l'API.) Tj ET
+BT /F2 14.0 Tf 1 0 0 1 48.00 106.89 Tm (Workflows disponibles) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 90.89 Tm (- Collecte batch : `scripts/backfill_predictions.py`, `scripts/update_roadmap.py`,) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 74.89 Tm (    `scripts/publish_roadmap.py`.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 58.89 Tm (- Entrainement ML : `scripts/train_prediction_model.py` produit `models/*.joblib` +) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Length 2840 >>
+stream
+BT /F1 11.0 Tf 1 0 0 1 48.00 777.89 Tm (    metriques JSON.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 761.89 Tm (- Deploiement : `scripts/deploy.py` \(pytest + archive\) et workflow GitHub) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 745.89 Tm (    `publish-roadmap.yml`.) Tj ET
+BT /F2 14.0 Tf 1 0 0 1 48.00 716.89 Tm (Integrations & secrets) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 700.89 Tm (- API-Football : cle hard-codee dans `utils/config.py`, utilisee par) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 684.89 Tm (    `utils/api_calls.py` avec cache TTL.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 668.89 Tm (- OpenWeather : cle attendue dans `.env` pour `utils/weather.py`.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 652.89 Tm (- OpenAI : cle projet exposee dans `utils/ai_.module.py` mais module non branche.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 636.89 Tm (- Aucun connecteur Supabase, Make ou reseaux sociaux malgre la roadmap.) Tj ET
+BT /F2 14.0 Tf 1 0 0 1 48.00 607.89 Tm (Elements en attente) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 591.89 Tm (1. Social/Content Engine : pas de stockage rapports, pas de diffusion externe.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 575.89 Tm (2. Notifications multi-canal et alerting Slack annonces mais absents du code.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 559.89 Tm (3. Gestion securisee des secrets \(Vault/CI\) non appliquee : cles dans le repo.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 543.89 Tm (4. Couverture tests limitee \(`tests/` ne couvre que quelques modules\).) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 527.89 Tm (5. Module AI externe \(`utils/ai_.module.py`\) inutilisable \(dependance manquante, cle) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 511.89 Tm (invalide\).) Tj ET
+BT /F2 14.0 Tf 1 0 0 1 48.00 482.89 Tm (Recommandations) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 466.89 Tm (1. **Securiser les secrets** : externaliser les cles API \(Football, OpenAI\) dans `.env` ou) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 450.89 Tm (un vault et nettoyer le code.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 434.89 Tm (2. **Industrialiser les rapports** : stocker metadata JSON, generer PDF et exposer la) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 418.89 Tm (liste dans l'app \(page Rapports\).) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 402.89 Tm (3. **Lancer le Social Engine** : definir sources \(prediction_history, match_filter\),) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 386.89 Tm (templating contenus et connecteurs reseaux sociaux.) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 370.89 Tm (4. **Etendre la supervision** : ajouter tests pour scripts critiques, surveiller) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 354.89 Tm (`utils/test_api_calls.py` \(H2H avec IDs\).) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 338.89 Tm (5. **Mettre a jour la roadmap** : aligner les elements reels \(projets Slack/Make non) Tj ET
+BT /F1 11.0 Tf 1 0 0 1 48.00 322.89 Tm (livres\) et suivre l'avancement dans `docs/reports/`.) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+8 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000264 00000 n 
+0000000407 00000 n 
+0000004379 00000 n 
+0000007271 00000 n 
+0000007341 00000 n 
+trailer << /Size 9 /Root 1 0 R >>
+startxref
+7416
+%%EOF

@@ -1,0 +1,17 @@
+{
+  "status": "skipped",
+  "reason": "Insufficient positive/negative samples",
+  "samples": 2,
+  "class_distribution": {
+    "1": 2
+  },
+  "generated_at": "2025-10-25T14:11:03.426409+00:00",
+  "features": [
+    "feature_home_draw_diff",
+    "feature_home_away_diff",
+    "feature_over_under_diff",
+    "feature_max_prob",
+    "feature_main_confidence_norm",
+    "feature_total_pick_over"
+  ]
+}

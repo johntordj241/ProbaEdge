@@ -1,0 +1,25 @@
+{
+  "custom_bookmakers": [],
+  "bankroll": {
+    "amount": 163.52,
+    "strategy": "kelly",
+    "flat_stake": 5.0,
+    "percent": 2.0,
+    "kelly_fraction": 0.5,
+    "default_odds": 2.0,
+    "min_stake": 1.0,
+    "max_stake": 100.0
+  },
+  "favorite_competitions": [],
+  "intensity_weights": {
+    "xg": 0.45,
+    "over": 0.35,
+    "btts": 0.2
+  },
+  "ui_defaults": {
+    "league_id": null,
+    "season": null,
+    "bookmakers": [],
+    "horizon_days": 1
+  }
+}

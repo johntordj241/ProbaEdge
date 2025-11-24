@@ -1,0 +1,50 @@
+name: Publish Roadmap
+
+on:
+  workflow_dispatch:
+    inputs:
+      league:
+        description: "League ID pour backfill (optionnel)"
+        required: false
+      season:
+        description: "Saison pour backfill (optionnel)"
+        required: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Optional backfill predictions
+        if: "${{ github.event.inputs.league != '' && github.event.inputs.season != '' }}"
+        run: |
+          python scripts/backfill_predictions.py --league ${{ github.event.inputs.league }} --season ${{ github.event.inputs.season }} --last 20
+
+      - name: Export supervision metrics
+        run: python scripts/export_supervision_metrics.py
+
+      - name: Publish roadmap
+        run: python scripts/publish_roadmap.py
+
+      - name: Run tests
+        run: python -m pytest
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/roadmap.md docs/supervision_metrics.json data/prediction_history.csv
+          git commit -m "chore: publish roadmap" || echo "Nothing to commit"
+          git push

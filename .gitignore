@@ -1,0 +1,12 @@
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# Python artefacts
+__pycache__/
+*.py[cod]
+
+# Build / test outputs
+.pytest_cache/
+dist/

@@ -1,0 +1,72 @@
+sections:
+  - title: "Collecte et donnees"
+    description: "Renforcer la collecte et les fondations data pour fiabiliser les calculs."
+    tasks:
+      - name: "Cache API et relecture hors ligne"
+        remaining: 0
+        details: "Purge planifiee + stats usage exposes dans la sidebar + limite taille cache."
+      - name: "Schemas unifies equipes / joueurs"
+        remaining: 0
+        details: "Normalisation teams/players en place; mapping statistics et referentiel IDs unifies entre toutes les sources."
+      - name: "Historique matches enrichi"
+        remaining: 0
+        details: "History_sync a importe les 3 dernieres saisons et fiabilise les correspondances fixtures/teams."
+      - name: "Flux evenements temps reel"
+        remaining: 0
+        details: "Endpoints events/lineups integres, xG/shots minute harmonises et prediction_history alimente avec les evenements temps reel."
+      - name: "Qualite data & validation"
+        remaining: 0
+        details: "Checks Great Expectations en production et tests de coherence sur historique.csv / cache API prevenant duplicats et anomalies."
+  - title: "Experience produit"
+    description: "Pages utilisateur, personnalisation et assistance a la prise de decision."
+    tasks:
+      - name: "Vue Bookmakers - comparatif cotes"
+        remaining: 0
+        details: "Vue multi-journee completee avec marches secondaires et sauvegarde des filtres relies au profil."
+      - name: "Page Profil et preferences"
+        remaining: 0
+        details: "UI par defaut liee aux favoris et parametres horizon/bookmakers appliques a toutes les vues statistiques/matches."
+      - name: "Guides prompts et parcours IA"
+        remaining: 0
+        details: "Prompts/alertes deployes sur toutes les pages et valides par feedback utilisateurs avec traductions disponibles."
+      - name: "Match Center interactif"
+        remaining: 0
+        details: "Fiches matchs, timeline et analytics_ui fusionnes dans une vue unique avec scenarios What-if et alertes personnalisees."
+      - name: "Notifications & alertes multi-canal"
+        remaining: 0
+        details: "Service d'alerting email/Discord branche sur match_filter diffusant edges et changements de cotes en quasi temps reel."
+  - title: "Fiabilite et exploitation"
+    description: "Mettre en place supervision, resilience et automation pour l'application."
+    tasks:
+      - name: "Surveillance erreurs API"
+        remaining: 0
+        details: "Retries + export JSON + workflow CI en place; supervision exploitable et script check_recovery disponible." 
+      - name: "Plan de reprise"
+        remaining: 0
+        details: "Plan de reprise documente (docs/plan_reprise.md) + scripts export/check."
+      - name: "Automatisation publication roadmap"
+        remaining: 0
+        details: "Script publish_roadmap + workflow GitHub Actions (publish-roadmap.yml) operables."
+      - name: "Gestion des secrets & rotation cles"
+        remaining: 0
+        details: "Cles OpenAI/API externalisees, config chiffree et rotation automatisee via vault/variables CI."
+      - name: "Alerting supervision temps reel"
+        remaining: 0
+        details: "Supervision branchee sur Slack/Webhook avec seuils quota/cache et generation automatique de post-mortem apres incident."
+  - title: "Apprentissage et analytics"
+    description: "Mesurer la performance IA et capitaliser sur l'historique."
+    tasks:
+      - name: "Historique predictions -> apprentissage"
+        remaining: 0
+        details: "Dataset export + script train_prediction_model.py alimentent la boucle d'apprentissage."
+      - name: "Tableau de bord precision"
+        remaining: 0
+        details: "Dashboard precision enrichi (filtres ligue/saison, ROI attendu vs reel)."
+      - name: "Backtests strategies & ROI cumulatif"
+        remaining: 0
+        details: "Backtests bankroll/strategies integres aux scripts/train_prediction_model.py avec reporting CSV et Streamlit."
+      - name: "Explainabilite des pronostics"
+        remaining: 0
+        details: "SHAP/feature importance disponibles dans les fiches matches et logs prediction_history pour expliquer les pronostics."
+
+
