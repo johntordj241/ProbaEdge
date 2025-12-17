@@ -2,6 +2,8 @@
 
 import streamlit as st
 
+from utils.auth_ui import ensure_authenticated, render_account_sidebar
+from utils.coach_ui import render_coach_widget
 from utils.cards import show_cards
 from utils.constants import DEFAULT_LEAGUE_ID, DEFAULT_SEASON, DEFAULT_TEAM_ID
 from utils.dashboard import show_dashboard
@@ -23,12 +25,15 @@ from utils.venues import show_venues
 from utils.profile_ui import show_profile
 from utils.analytics_ui import show_prediction_performance
 from utils.admin_ui import show_admin
+from utils.agenda import show_agenda
 from utils.history_sync import update_history_view
 from utils.performance_dashboard import show_performance_dashboard
 from utils.cache import render_cache_controls
 from utils.supervision import render_supervision_status
 from utils.supervision_dashboard import show_supervision_dashboard
 from utils.reports import show_reports
+from utils.offers import show_offers
+from utils.private_report import show_private_report
 
 st.set_page_config(page_title="Proba Edge", layout="wide")
 
@@ -36,11 +41,17 @@ DEFAULT_LEAGUE_ID = 61
 DEFAULT_SEASON = 2025
 DEFAULT_TEAM_ID = 85
 
+if not ensure_authenticated():
+    st.stop()
+
 MENU_OPTIONS = [
     "Dashboard",
+    "Agenda",
     "Roadmap",
     "Rapports",
     "Guides",
+    "Offres & abonnements",
+    "Audit interne",
     "Matchs",
     "Statistiques",
     "Classement",
@@ -66,6 +77,7 @@ render_cache_controls(st.sidebar, key_prefix="main_")
 st.sidebar.markdown("---")
 render_supervision_status(st.sidebar)
 st.sidebar.markdown("---")
+render_account_sidebar(st.sidebar)
 
 menu = st.sidebar.radio("Navigation", MENU_OPTIONS)
 
@@ -82,12 +94,18 @@ else:
 
 if menu == "Dashboard":
     show_dashboard(DEFAULT_LEAGUE_ID, DEFAULT_SEASON, DEFAULT_TEAM_ID)
+elif menu == "Agenda":
+    show_agenda()
 elif menu == "Roadmap":
     show_roadmap()
 elif menu == "Rapports":
     show_reports()
 elif menu == "Guides":
     show_guides()
+elif menu == "Offres & abonnements":
+    show_offers()
+elif menu == "Audit interne":
+    show_private_report()
 elif menu == "Matchs":
     show_matches(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
 elif menu == "Statistiques":
@@ -128,3 +146,5 @@ elif menu == "Tester l'API":
         run_all_tests()
 elif menu == "Admin":
     show_admin()
+
+render_coach_widget()
