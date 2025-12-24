@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import csv
+from collections import defaultdict
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -24,15 +25,31 @@ HEADER = [
     'prob_home','prob_draw','prob_away','prob_over_2_5','prob_under_2_5',
     'main_pick','main_confidence','edge_comment','top_score','total_pick',
     'bet_selection','bet_bookmaker','bet_odd','bet_stake','bet_timestamp','bet_notes','bet_result','bet_return',
+    'bankroll_profile_id','bankroll_profile_name',
     'status_snapshot','result_status','result_score','result_winner','updated_at',
     'feature_home_draw_diff','feature_home_away_diff','feature_over_under_diff','feature_max_prob',
     'feature_main_confidence_norm','feature_total_pick_over',
-    'feature_lambda_home','feature_lambda_away','elo_home','elo_away','delta_elo','pressure_score','intensity_score'
+    'feature_lambda_home','feature_lambda_away','elo_home','elo_away','delta_elo','pressure_score','intensity_score',
+    'ai_analysis','ai_generated_at','ai_scenarios','ai_scenarios_generated_at',
+    'alt_home','alt_draw','alt_away','alt_delta_home','alt_delta_draw','alt_delta_away','alt_generated_at'
 ]
 FLOAT_COLUMNS = {
     'prob_home','prob_draw','prob_away','prob_over_2_5','prob_under_2_5','bet_odd','bet_stake','bet_return',
     'feature_home_draw_diff','feature_home_away_diff','feature_over_under_diff','feature_max_prob','feature_main_confidence_norm',
-    'feature_lambda_home','feature_lambda_away','elo_home','elo_away','delta_elo','pressure_score','intensity_score'
+    'feature_lambda_home','feature_lambda_away','elo_home','elo_away','delta_elo','pressure_score','intensity_score',
+    'alt_home','alt_draw','alt_away','alt_delta_home','alt_delta_draw','alt_delta_away'
+}
+PRESERVE_NONEMPTY_FIELDS = {
+    'bet_selection',
+    'bet_timestamp',
+    'bet_bookmaker',
+    'bet_odd',
+    'bet_stake',
+    'bet_notes',
+    'bet_result',
+    'bet_return',
+    'bankroll_profile_id',
+    'bankroll_profile_name',
 }
 FINISHED_STATUS = {"FT", "AET", "PEN"}
 
@@ -215,6 +232,24 @@ def _ensure_file() -> None:
     if not PREDICTION_HISTORY_PATH.exists():
         with PREDICTION_HISTORY_PATH.open('w', encoding='utf-8', newline='') as handle:
             csv.DictWriter(handle, fieldnames=HEADER).writeheader()
+        return
+    try:
+        with PREDICTION_HISTORY_PATH.open('r', encoding='utf-8', newline='') as handle:
+            reader = csv.reader(handle)
+            existing_header = next(reader, [])
+    except Exception:
+        existing_header = []
+    if list(existing_header) == HEADER:
+        return
+    try:
+        df = pd.read_csv(PREDICTION_HISTORY_PATH)
+    except Exception:
+        df = pd.DataFrame(columns=HEADER)
+    for column in HEADER:
+        if column not in df.columns:
+            df[column] = pd.NA if column in FLOAT_COLUMNS else ''
+    df = df[HEADER]
+    df.to_csv(PREDICTION_HISTORY_PATH, index=False)
 
 
 def load_prediction_history(path: str = 'data/prediction_history.csv') -> pd.DataFrame:
@@ -482,7 +517,19 @@ def upsert_prediction(entry: Dict[str, Any]) -> None:
 
     idx = mask[mask].index[0]
     for key in HEADER:
-        df.at[idx, key] = payload.get(key, '')
+        new_value = payload.get(key, '')
+        if (
+            key in PRESERVE_NONEMPTY_FIELDS
+            and (new_value in {'', None})
+        ):
+            existing_value = df.at[idx, key]
+            if isinstance(existing_value, float) and pd.isna(existing_value):
+                df.at[idx, key] = new_value
+                continue
+            if existing_value not in {'', None} and not (isinstance(existing_value, float) and pd.isna(existing_value)):
+                df.at[idx, key] = existing_value
+                continue
+        df.at[idx, key] = new_value
     df.to_csv(PREDICTION_HISTORY_PATH, index=False)
 
 
@@ -676,7 +723,7 @@ def update_outcome(
         return False
     rows: List[Dict[str, Any]] = []
     updated = False
-    bankroll_delta = 0.0
+    bankroll_deltas: Dict[Optional[str], float] = defaultdict(float)
     with PREDICTION_HISTORY_PATH.open('r', encoding='utf-8', newline='') as handle:
         reader = csv.DictReader(handle)
         for row in reader:
@@ -718,7 +765,9 @@ def update_outcome(
                     row['bet_return'] = payout
                     diff = payout - previous_return
                     if abs(diff) > 1e-9:
-                        bankroll_delta += diff
+                        profile_token = (row.get('bankroll_profile_id') or '').strip()
+                        profile_key = profile_token or None
+                        bankroll_deltas[profile_key] += diff
                 updated = True
             rows.append(row)
     if updated:
@@ -726,8 +775,9 @@ def update_outcome(
             writer = csv.DictWriter(handle, fieldnames=HEADER)
             writer.writeheader()
             writer.writerows(rows)
-        if abs(bankroll_delta) > 1e-9:
-            adjust_bankroll(bankroll_delta)
+        for profile_key, delta in bankroll_deltas.items():
+            if abs(delta) > 1e-9:
+                adjust_bankroll(delta, profile_id=profile_key)
     return updated
 
 
@@ -741,6 +791,8 @@ def record_bet(
     stake: Optional[float] = None,
     timestamp: Optional[str] = None,
     notes: str = '',
+    profile_id: Optional[str] = None,
+    profile_name: Optional[str] = None,
 ) -> bool:
     if is_offline_mode():
         return False
@@ -789,6 +841,26 @@ def record_bet(
     df.at[idx, 'bet_notes'] = notes
     df.at[idx, 'bet_odd'] = float(odd) if odd is not None else pd.NA
     df.at[idx, 'bet_stake'] = new_stake if stake is not None else pd.NA
+    existing_profile_id = ''
+    existing_profile_name = ''
+    if 'bankroll_profile_id' in df.columns:
+        value = df.at[idx, 'bankroll_profile_id']
+        if isinstance(value, str):
+            existing_profile_id = value.strip()
+        elif pd.notna(value):
+            existing_profile_id = str(value).strip()
+    if 'bankroll_profile_name' in df.columns:
+        value = df.at[idx, 'bankroll_profile_name']
+        if isinstance(value, str):
+            existing_profile_name = value.strip()
+        elif pd.notna(value):
+            existing_profile_name = str(value).strip()
+    applied_profile_id = (profile_id or existing_profile_id or '').strip()
+    applied_profile_name = (profile_name or existing_profile_name or '').strip()
+    if 'bankroll_profile_id' in df.columns:
+        df.at[idx, 'bankroll_profile_id'] = applied_profile_id
+    if 'bankroll_profile_name' in df.columns:
+        df.at[idx, 'bankroll_profile_name'] = applied_profile_name
     if 'bet_result' in df.columns:
         df.at[idx, 'bet_result'] = ''
     if 'bet_return' in df.columns:
@@ -797,7 +869,7 @@ def record_bet(
 
     delta = prev_stake - new_stake
     if abs(delta) > 1e-9:
-        adjust_bankroll(delta)
+        adjust_bankroll(delta, profile_id=applied_profile_id or None)
     return True
 
 
@@ -812,7 +884,8 @@ def seed_sample_predictions(force: bool = False) -> bool:
         writer = csv.DictWriter(handle, fieldnames=HEADER)
         writer.writeheader()
         for row in SAMPLE_ROWS:
-            writer.writerow(row)
+            payload = {key: row.get(key, '') for key in HEADER}
+            writer.writerow(payload)
     return True
 
 

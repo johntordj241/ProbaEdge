@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import utils.predictions as preds
 from utils.bankroll import BankrollSettings
+from utils.prediction_model import TeamStrength, apply_context_adjustments
 
 
 def _strength(name: str):
@@ -91,3 +92,35 @@ def test_note_ia_lines_outputs_disclaimer():
     assert bullets
     assert "Facteurs contextuels" in bullets[-1]
     assert "modeles statistiques" in disclaimer
+
+
+def test_apply_context_adjustments_reacts_to_injuries():
+    home = TeamStrength(
+        team_id=1,
+        name="Home FC",
+        attack=1.2,
+        defense=1.0,
+        lambda_value=1.6,
+        z_score=0.1,
+        adjustments=[],
+    )
+    away = TeamStrength(
+        team_id=2,
+        name="Away FC",
+        attack=1.1,
+        defense=1.1,
+        lambda_value=1.4,
+        z_score=0.0,
+        adjustments=[],
+    )
+    fixture = {
+        "fixture": {"status": {"short": "NS"}},
+        "teams": {"home": {"missing_players": []}, "away": {"missing_players": []}},
+    }
+    injuries_home = [{"player": {"name": "Key Striker", "type": "Hamstring"}}]
+
+    context = apply_context_adjustments(home, away, fixture, injuries_home=injuries_home)
+
+    assert home.lambda_value < 1.6
+    assert any("Blessures" in note for note in context.adjustments_home)
+    assert any("Key Striker" in note for note in context.injuries)

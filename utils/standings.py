@@ -8,6 +8,7 @@ import streamlit as st
 from .api_calls import get_standings as fetch_standings
 from .ui_helpers import select_league_and_season
 from .widgets import render_widget
+from .form_utils import render_form_table
 
 
 def _extract_table(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -18,77 +19,6 @@ def _extract_table(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     if not standings:
         return []
     return standings[0]
-
-
-FORM_LABELS = {
-    "W": "V",
-    "L": "D",
-    "D": "N",
-    "V": "V",
-    "N": "N",
-}
-
-FORM_CLASSES = {
-    "W": "win",
-    "V": "win",
-    "L": "loss",
-    "D": "loss",
-    "N": "draw",
-}
-
-
-def _form_badges_html(form: Optional[str]) -> str:
-    if not form:
-        return "<span class='form-badge neutral'>-</span>"
-    badges: list[str] = []
-    cleaned = form.replace(" ", "").replace(",", "")
-    for char in cleaned.strip():
-        label = FORM_LABELS.get(char.upper(), char.upper())
-        css_class = FORM_CLASSES.get(char.upper(), "neutral")
-        badges.append(f"<span class='form-badge {css_class}'>{label}</span>")
-    return "".join(badges)
-
-
-def _render_form_table(teams: list[dict[str, Any]]) -> str:
-    rows_html = []
-    for entry in teams:
-        rows_html.append(
-            f"<tr><td class='team'>{entry['team']}</td><td>{_form_badges_html(entry['form'])}</td></tr>"
-        )
-    return f"""
-    <style>
-    .form-table {{
-        border-collapse: collapse;
-        width: 100%;
-    }}
-    .form-table td {{
-        padding: 4px 8px;
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-    }}
-    .form-table td.team {{
-        font-weight: 600;
-        width: 30%;
-    }}
-    .form-badge {{
-        display: inline-block;
-        width: 22px;
-        height: 22px;
-        line-height: 22px;
-        text-align: center;
-        border-radius: 4px;
-        margin-right: 4px;
-        color: #fff;
-        font-size: 0.8rem;
-    }}
-    .form-badge.win {{ background-color: #2ecc71; }}
-    .form-badge.draw {{ background-color: #f1c40f; color: #111; }}
-    .form-badge.loss {{ background-color: #e74c3c; }}
-    .form-badge.neutral {{ background-color: #7f8c8d; }}
-    </style>
-    <table class="form-table">
-        {''.join(rows_html)}
-    </table>
-    """
 
 
 def show_standings(
@@ -171,7 +101,7 @@ def show_standings(
 
     if form_rows:
         st.subheader("Forme visuelle (5 derniers matches)")
-        st.markdown(_render_form_table(form_rows), unsafe_allow_html=True)
+        st.markdown(render_form_table(form_rows), unsafe_allow_html=True)
         if form_scope_missing and scope_key != "all":
             st.info("Les données de forme domicile/extérieur ne sont pas fournies par l'API pour cette ligue. Affichage de la forme globale à la place.")
 

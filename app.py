@@ -1,11 +1,19 @@
 ﻿from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 import streamlit as st
 
 from utils.auth_ui import ensure_authenticated, render_account_sidebar
 from utils.coach_ui import render_coach_widget
 from utils.cards import show_cards
 from utils.constants import DEFAULT_LEAGUE_ID, DEFAULT_SEASON, DEFAULT_TEAM_ID
+from utils.chat_ui import show_chat_assistant
 from utils.dashboard import show_dashboard
 from utils.fixtures import show_matches
 from utils.guides import show_guides
@@ -34,6 +42,12 @@ from utils.supervision_dashboard import show_supervision_dashboard
 from utils.reports import show_reports
 from utils.offers import show_offers
 from utils.private_report import show_private_report
+from utils.institutional import (
+    show_access_governance,
+    show_methodology_limits,
+    show_security_data,
+    show_legal_responsibility,
+)
 
 st.set_page_config(page_title="Proba Edge", layout="wide")
 
@@ -46,6 +60,7 @@ if not ensure_authenticated():
 
 MENU_OPTIONS = [
     "Dashboard",
+    "Assistant IA",
     "Agenda",
     "Roadmap",
     "Rapports",
@@ -71,7 +86,21 @@ MENU_OPTIONS = [
     "H2H",
     "Tester l'API",
     "Admin",
+    "Acces & gouvernance",
+    "Methodologie & limites",
+    "Securite & donnees",
+    "Mentions legales",
 ]
+
+COACH_ALLOWED_PAGES = {
+    "Cartons",
+    "Cotes",
+    "Bookmakers",
+    "H2H",
+    "Performance IA",
+    "Tableau IA",
+    "Supervision",
+}
 
 render_cache_controls(st.sidebar, key_prefix="main_")
 st.sidebar.markdown("---")
@@ -94,6 +123,8 @@ else:
 
 if menu == "Dashboard":
     show_dashboard(DEFAULT_LEAGUE_ID, DEFAULT_SEASON, DEFAULT_TEAM_ID)
+elif menu == "Assistant IA":
+    show_chat_assistant()
 elif menu == "Agenda":
     show_agenda()
 elif menu == "Roadmap":
@@ -131,9 +162,9 @@ elif menu == "Profil":
 elif menu == "Historique":
     update_history_view()
 elif menu == "Performance IA":
-    show_prediction_performance()
-elif menu == "Tableau IA":
     show_performance_dashboard()
+elif menu == "Tableau IA":
+    show_prediction_performance()
 elif menu == "Supervision":
     show_supervision_dashboard()
 elif menu == "Stades":
@@ -146,5 +177,14 @@ elif menu == "Tester l'API":
         run_all_tests()
 elif menu == "Admin":
     show_admin()
+elif menu == "Acces & gouvernance":
+    show_access_governance()
+elif menu == "Methodologie & limites":
+    show_methodology_limits()
+elif menu == "Securite & donnees":
+    show_security_data()
+elif menu == "Mentions legales":
+    show_legal_responsibility()
 
-render_coach_widget()
+if menu in COACH_ALLOWED_PAGES:
+    render_coach_widget()

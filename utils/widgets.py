@@ -129,9 +129,19 @@ def build_widget_html(
 
     config_tag = _widget_tag("config", config_attrs)
 
+    style_tag = (
+        "<style>"
+        "html, body {"
+        "background-color:#0E1117 !important;"
+        "margin:0;"
+        "padding:0;"
+        "}"
+        "</style>"
+    )
+
     script_tag = f'<script type="module" src="{WIDGET_SCRIPT_URL}"></script>'
 
-    return "\n".join([widget_tag, config_tag, script_tag])
+    return "\n".join([style_tag, widget_tag, config_tag, script_tag])
 
 
 
@@ -161,7 +171,14 @@ def render_widget(
 
         return
 
-    st_html(markup, height=height, scrolling=scrolling)
+    container = (
+        f"<div style=\"height:{height}px;width:100%;"
+        "display:flex;align-items:center;justify-content:center;"
+        "background-color:#0E1117;border-radius:18px;overflow:hidden;margin:0;padding:0;\">"
+        f"{markup}"
+        "</div>"
+    )
+    st_html(container, height=height, scrolling=scrolling)
 
 
 

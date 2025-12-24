@@ -7,6 +7,7 @@ from math import comb
 from pathlib import Path
 from statistics import mean, pstdev
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+import unicodedata
 
 import joblib
 import numpy as np
@@ -557,6 +558,9 @@ def apply_context_adjustments(
     home: TeamStrength,
     away: TeamStrength,
     fixture: Dict[str, Any],
+    *,
+    injuries_home: Optional[List[Dict[str, Any]]] = None,
+    injuries_away: Optional[List[Dict[str, Any]]] = None,
 ) -> ContextAdjustments:
     context = ContextAdjustments()
     status_short = _safe(fixture, "fixture", "status", "short", default="NS")
@@ -585,6 +589,29 @@ def apply_context_adjustments(
             if keyword in reason:
                 count += 1
         return count
+
+    def _injury_notes(entries: Optional[List[Dict[str, Any]]], team_name: str) -> List[str]:
+        notes: List[str] = []
+        seen: set[str] = set()
+        for entry in entries or []:
+            player_block = _safe(entry, "player", default={}) or {}
+            name = player_block.get("name")
+            if not name:
+                continue
+            detail = (
+                player_block.get("type")
+                or entry.get("type")
+                or player_block.get("reason")
+                or entry.get("reason")
+            )
+            label = f"{team_name} - {name}"
+            if detail:
+                label = f"{label} ({detail})"
+            if label in seen:
+                continue
+            seen.add(label)
+            notes.append(label)
+        return notes
 
     # Mi-temps / live
     if status_short in {"HT", "1H", "LIVE", "2H"}:
@@ -664,6 +691,18 @@ def apply_context_adjustments(
     context_payload["suspensions_home"] = _count_missing(home_team_block, "suspens")
     context_payload["suspensions_away"] = _count_missing(away_team_block, "suspens")
 
+    injury_notes_home = _injury_notes(injuries_home, home.name)
+    injury_notes_away = _injury_notes(injuries_away, away.name)
+    if injury_notes_home:
+        context_payload["key_injuries_home"] = min(len(injury_notes_home), 3)
+    if injury_notes_away:
+        context_payload["key_injuries_away"] = min(len(injury_notes_away), 3)
+    existing_injury_notes = set(context.injuries)
+    for note in injury_notes_home + injury_notes_away:
+        if note not in existing_injury_notes:
+            context.injuries.append(note)
+            existing_injury_notes.add(note)
+
     for event in _safe(fixture, "events", default=[]):
         detail = str(event.get("detail", ""))
         team_name = _safe(event, "team", "name", default="")
@@ -715,8 +754,30 @@ def probable_goalscorers(
     players_home: List[Dict[str, Any]],
     players_away: List[Dict[str, Any]],
     topn: int = 6,
+    *,
+    injured_home: Optional[Iterable[str]] = None,
+    injured_away: Optional[Iterable[str]] = None,
 ) -> List[Dict[str, Any]]:
     picks: List[Dict[str, Any]] = []
+
+    def _normalize_name(name: Optional[str]) -> str:
+        if not name:
+            return ""
+        normalized = unicodedata.normalize("NFKD", name)
+        return "".join(ch for ch in normalized if not unicodedata.combining(ch)).strip().lower()
+
+    injured_home_set = {_normalize_name(name) for name in (injured_home or []) if name}
+    injured_away_set = {_normalize_name(name) for name in (injured_away or []) if name}
+
+    def _is_injured(candidate_name: str, team_id: int) -> bool:
+        normalized = _normalize_name(candidate_name)
+        if not normalized:
+            return False
+        if team_id == home_id:
+            return normalized in injured_home_set
+        if team_id == away_id:
+            return normalized in injured_away_set
+        return False
 
     def candidate_from_top(entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         team_id = _safe(entry, "statistics", 0, "team", "id")
@@ -741,24 +802,44 @@ def probable_goalscorers(
 
     for entry in topscorers or []:
         candidate = candidate_from_top(entry)
-        if candidate:
+        if candidate and not _is_injured(candidate["name"], candidate["team_id"]):
             picks.append(candidate)
 
     def fill_from_squad(players: List[Dict[str, Any]], team_id: int, lambda_team: float) -> None:
         def _player_position(entry: Dict[str, Any]) -> str:
             return str(_safe(entry, "statistics", 0, "games", "position", default="")).lower()
 
-        candidates = [p for p in players if _player_position(p).startswith("att")]
+        def _scoring_metric(entry: Dict[str, Any]) -> float:
+            stats = _safe(entry, "statistics", 0, default={})
+            goals = float(_safe(stats, "goals", "total", default=0) or 0)
+            shots = float(_safe(stats, "shots", "total", default=0) or 0)
+            minutes = float(_safe(stats, "games", "minutes", default=0) or 0)
+            matches = max(minutes / 90.0, 1.0) if minutes else 1.0
+            goals_per_90 = goals / matches
+            shots_per_90 = shots / matches
+            return (goals_per_90 * 0.7) + (shots_per_90 * 0.3)
+
+        candidates = [
+            p for p in players
+            if not _player_position(p).startswith("gk")
+        ]
         if not candidates:
-            candidates = players[:3]
-        base_prob = min(0.45, max(0.12, lambda_team / 3.0))
-        for player in candidates[:2]:
+            candidates = players[:4]
+        candidates.sort(key=_scoring_metric, reverse=True)
+        base_prob = min(0.45, max(0.15, lambda_team / 2.5))
+
+        for player in candidates[:3]:
+            player_name = _safe(player, "player", "name", default="Buteur potentiel")
+            if _is_injured(player_name, team_id):
+                continue
+            score = max(_scoring_metric(player), 0.05)
+            prob = min(0.7, max(base_prob, score * 0.4 + base_prob * 0.6))
             picks.append(
                 {
                     "team_id": team_id,
-                    "name": _safe(player, "player", "name", default="Attaquant"),
+                    "name": player_name,
                     "photo": _safe(player, "player", "photo"),
-                    "prob": base_prob,
+                    "prob": prob,
                     "source": "squad",
                 }
             )

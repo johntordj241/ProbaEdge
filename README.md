@@ -1,4 +1,4 @@
-# Proba Edge - Assistant IA pour paris sportifs
+﻿# Proba Edge - Assistant IA pour paris sportifs
 
 Proba Edge est un dashboard Streamlit. Il combine les donnees API-FOOTBALL, plusieurs couches statistiques et une supervision bankroll pour piloter une session de pari. Depuis la version **v2.5**, le moteur repose sur une architecture multi-couches (Elo + Dixon-Coles + ajustements contextuels + Markov live + calibration ML) qui fournit des probabilites recalibrees, des intervalles de confiance et des recommandations plus solides.
 
@@ -37,7 +37,7 @@ pip install -r requirements.txt
 
 ### Variables d'environnement indispensables
 
-Copiez `.env.example` vers `.env` (non versionné) ou exportez ces variables avant de lancer Streamlit :
+Copiez `.env.example` vers `.env` (non versionnÃ©) ou exportez ces variables avant de lancer Streamlit :
 
 ```
 API_FOOTBALL_KEY=XXXX
@@ -46,14 +46,22 @@ OPENWEATHER_API_KEY=XXXX
 OPENAI_API_KEY=XXXX
 SUPABASE_URL=...
 SUPABASE_SERVICE_KEY=...
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_CHAT_ID=...
 SOCIAL_X_TOKEN=...
 SOCIAL_DISCORD_TOKEN=...
 DISCORD_WEBHOOK_URL=...
 SLACK_WEBHOOK_URL=...
 ```
 
-Les modules sensibles (`utils/config.py`, `utils/widgets.py`, `utils/ai_.module.py`, `utils/weather.py`, `utils/supabase_client.py`) refusent désormais de s'exécuter si la clé correspondante est absente.  
-> Tip : définissez `FOOTBALL_APP_ENV_FILE=/chemin/vers/mon.env` pour charger un fichier .env alternatif (Vault / CI).
+Les modules sensibles (`utils/config.py`, `utils/widgets.py`, `utils/ai_.module.py`, `utils/weather.py`, `utils/supabase_client.py`) refusent dÃ©sormais de s'exÃ©cuter si la clÃ© correspondante est absente.  
+> Tip : dÃ©finissez `FOOTBALL_APP_ENV_FILE=/chemin/vers/mon.env` pour charger un fichier .env alternatif (Vault / CI).
+
+**Activer Telegram (optionnel, diffusion controlee)**
+1. Dans Telegram, ouvrez **@BotFather**, lancez `/start` puis `/newbot` pour obtenir `TELEGRAM_BOT_TOKEN`.
+2. Envoyez un message a votre bot puis appelez `https://api.telegram.org/bot<TOKEN>/getUpdates` (ou utilisez `@RawDataBot`) pour recuperer `TELEGRAM_CHAT_ID`.
+3. Ajoutez ces deux valeurs dans `.env` : le bouton **Telegram** de la section *Diffusion & partage* s'activera automatiquement.
+
 
 ## Lancer le dashboard
 
@@ -67,7 +75,7 @@ streamlit run app.py
 pytest
 ```
 > Pour la CI (GitHub Actions, GitLab, cron), lancez `pytest tests/` afin de couvrir le moteur Social Engine, notifications et supervision.
-> Le workflow `.github/workflows/tests.yml` exécute automatiquement ces tests sur chaque push/PR.
+> Le workflow `.github/workflows/tests.yml` exÃ©cute automatiquement ces tests sur chaque push/PR.
 
 ### Scripts utiles
 
@@ -78,7 +86,9 @@ pytest
 | `python scripts/deploy.py` | Execute les tests puis genere `dist/football_app_release.zip` |
 | `python scripts/export_supervision_metrics.py` | Exporte les metriques de supervision |
 | `python scripts/publish_roadmap.py` | Regenere `docs/roadmap.md` a partir de `data/roadmap.yaml` |
-| `python scripts/social_engine.py --publish` | Génère le résumé Social Engine et le publie (Slack/Discord + Supabase) |
+| `python scripts/social_engine.py --publish` | GÃ©nÃ¨re le rÃ©sumÃ© Social Engine et le publie (Slack/Discord + Supabase) |
+| `py -3.11 scripts/auto_broadcast.py --mode pre-match --channels telegram` | Diffuse automatiquement les templates (pré-match / live / edge) vers les canaux configurés |
+| `py -3.11 scripts/auto_broadcast.py --mode pre-match --channels telegram --agenda-date today` | Même diffusion mais limitée aux matchs présents dans l'Agenda du jour |
 
 ## Structure des donnees
 
@@ -100,10 +110,10 @@ Contributions bienvenues : ouvrez une issue ou proposez une MR en verifiant que 
 
 ### Moteur Social / Content
 
-- Depuis l'onglet **Administration → Jeu de donnees**, générez un résumé en un clic (prévisualisation, export Markdown, publication Slack/Discord).
-- En ligne de commande : `python scripts/social_engine.py --publish` pour automatiser la génération quotidienne (cron ou GitHub Actions).
-- Les rapports sont stockés dans `docs/reports/` et synchronisés dans Supabase via `store_report_metadata`.
-- La page **Rapports** se connecte automatiquement à Supabase (`reports` table) quand la configuration est disponible, sinon elle lit les fichiers locaux.
+- Depuis l'onglet **Administration â†’ Jeu de donnees**, gÃ©nÃ©rez un rÃ©sumÃ© en un clic (prÃ©visualisation, export Markdown, publication Slack/Discord).
+- En ligne de commande : `python scripts/social_engine.py --publish` pour automatiser la gÃ©nÃ©ration quotidienne (cron ou GitHub Actions).
+- Les rapports sont stockÃ©s dans `docs/reports/` et synchronisÃ©s dans Supabase via `store_report_metadata`.
+- La page **Rapports** se connecte automatiquement Ã  Supabase (`reports` table) quand la configuration est disponible, sinon elle lit les fichiers locaux.
 
 ---
 
@@ -114,3 +124,5 @@ python -c "from utils.prediction_history import normalize_prediction_history; no
 ```
 
 Bon build et bonnes sessions Proba Edge !
+
+

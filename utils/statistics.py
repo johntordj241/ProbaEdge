@@ -8,6 +8,7 @@ import streamlit as st
 
 from .api_calls import get_statistics
 from .ui_helpers import select_league_and_season, select_team
+from .profile import list_saved_scenes
 from .widgets import render_widget
 
 
@@ -49,16 +50,45 @@ def show_statistics(
 ) -> None:
     st.header("Statistiques d'équipe")
 
+    saved_scenes = list_saved_scenes()
+    scene_defaults_config = st.session_state.pop("_statistics_scene_to_apply", None)
+    sidebar_scene_options = [{"id": "", "name": "Aucune scène", "config": {}}] + saved_scenes
+    sidebar_scene_labels = [entry["name"] or "Scène" for entry in sidebar_scene_options]
+    current_sidebar_scene_id = st.session_state.get("_statistics_scene_current", "")
+    try:
+        sidebar_default_index = next(
+            idx for idx, entry in enumerate(sidebar_scene_options) if entry["id"] == current_sidebar_scene_id
+        )
+    except StopIteration:
+        sidebar_default_index = 0
+    sidebar_choice = st.sidebar.selectbox(
+        "Scène rapide (stats)",
+        options=list(range(len(sidebar_scene_options))),
+        index=sidebar_default_index,
+        format_func=lambda idx: sidebar_scene_labels[idx],
+        key="statistics_scene_select",
+    )
+    selected_sidebar_scene = sidebar_scene_options[sidebar_choice]
+    if selected_sidebar_scene.get("id"):
+        if selected_sidebar_scene["id"] != current_sidebar_scene_id:
+            st.session_state["_statistics_scene_to_apply"] = selected_sidebar_scene.get("config", {})
+            st.session_state["_statistics_scene_current"] = selected_sidebar_scene["id"]
+            st.experimental_rerun()
+    else:
+        if current_sidebar_scene_id:
+            st.session_state["_statistics_scene_current"] = ""
+
     league_id, season, league_label = select_league_and_season(
-        default_league_id=default_league_id,
-        default_season=default_season,
+        default_league_id=scene_defaults_config.get("league_id") if scene_defaults_config else default_league_id,
+        default_season=scene_defaults_config.get("season") if scene_defaults_config else default_season,
+        respect_user_defaults=False if scene_defaults_config else True,
     )
     st.caption(f"{league_label} - Saison {season}")
 
     team_id = select_team(
         league_id,
         season,
-        default_team_id=default_team_id,
+        default_team_id=scene_defaults_config.get("team_id") if scene_defaults_config else default_team_id,
         placeholder="Sélectionnez une équipe",
         key=f"stats_team_{league_id}_{season}",
     )
@@ -129,4 +159,3 @@ def show_statistics(
     st.markdown("---")
     st.subheader("Widget officiel - �quipe")
     render_widget("team", height=680, team_id=int(team_id), league=league_id, season=season)
-

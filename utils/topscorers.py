@@ -7,6 +7,7 @@ import streamlit as st
 
 from .api_calls import get_topscorers
 from .ui_helpers import select_league_and_season
+from .profile import list_saved_scenes
 from .widgets import render_widget
 
 
@@ -16,9 +17,38 @@ def show_topscorers(
 ) -> None:
     st.header("Meilleurs buteurs")
 
+    saved_scenes = list_saved_scenes()
+    scene_defaults_config = st.session_state.pop("_topscorers_scene_to_apply", None)
+    sidebar_scene_options = [{"id": "", "name": "Aucune scène", "config": {}}] + saved_scenes
+    sidebar_scene_labels = [entry["name"] or "Scène" for entry in sidebar_scene_options]
+    current_sidebar_scene_id = st.session_state.get("_topscorers_scene_current", "")
+    try:
+        sidebar_default_index = next(
+            idx for idx, entry in enumerate(sidebar_scene_options) if entry["id"] == current_sidebar_scene_id
+        )
+    except StopIteration:
+        sidebar_default_index = 0
+    sidebar_choice = st.sidebar.selectbox(
+        "Scène rapide (buteurs)",
+        options=list(range(len(sidebar_scene_options))),
+        index=sidebar_default_index,
+        format_func=lambda idx: sidebar_scene_labels[idx],
+        key="topscorers_scene_select",
+    )
+    selected_sidebar_scene = sidebar_scene_options[sidebar_choice]
+    if selected_sidebar_scene.get("id"):
+        if selected_sidebar_scene["id"] != current_sidebar_scene_id:
+            st.session_state["_topscorers_scene_to_apply"] = selected_sidebar_scene.get("config", {})
+            st.session_state["_topscorers_scene_current"] = selected_sidebar_scene["id"]
+            st.experimental_rerun()
+    else:
+        if current_sidebar_scene_id:
+            st.session_state["_topscorers_scene_current"] = ""
+
     league_id, season, league_label = select_league_and_season(
-        default_league_id=default_league_id,
-        default_season=default_season,
+        default_league_id=scene_defaults_config.get("league_id") if scene_defaults_config else default_league_id,
+        default_season=scene_defaults_config.get("season") if scene_defaults_config else default_season,
+        respect_user_defaults=False if scene_defaults_config else True,
     )
     st.caption(f"{league_label} - Saison {season}")
 
@@ -75,4 +105,3 @@ def show_topscorers(
     st.markdown("---")
     st.subheader("Widget officiel - Buteurs")
     render_widget("topscorers", height=720, league=league_id, season=season)
-

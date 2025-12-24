@@ -198,6 +198,20 @@ def _default_league_index(leagues: List[Dict[str, Any]], default_id: Optional[in
     return 0
 
 
+def _format_league_label(item: Any) -> str:
+    if isinstance(item, dict):
+        label = item.get("label")
+        if label:
+            return label
+        name = item.get("name")
+        if name:
+            return name
+        identifier = item.get("id")
+        if identifier is not None:
+            return f"Ligue {identifier}"
+    return str(item)
+
+
 def select_league_and_season(
     *,
     league_label: str = "Championnat",
@@ -300,12 +314,32 @@ def select_league_and_season(
         filtered = leagues
 
     index = _default_league_index(filtered, pref_league_id)
+    league_key = f"{key_prefix}league_select" if key_prefix else "league_select"
     selected_league = st.selectbox(
         league_label,
         options=filtered,
         index=min(index, len(filtered) - 1),
-        format_func=lambda item: item.get("label", "Ligue"),
+        key=league_key,
+        format_func=_format_league_label,
     )
+
+    if not isinstance(selected_league, dict):
+        fallback = None
+        if isinstance(selected_league, str):
+            fallback = next(
+                (
+                    item
+                    for item in filtered
+                    if item.get("label") == selected_league or item.get("name") == selected_league
+                ),
+                None,
+            )
+        if fallback is None and filtered:
+            fallback = filtered[0]
+        selected_league = fallback or {}
+        if not selected_league:
+            st.error("Impossible d'initialiser la ligue selectionnee.")
+            st.stop()
 
     season_options = selected_league.get("seasons") or []
     if not season_options and selected_league.get("current_season"):

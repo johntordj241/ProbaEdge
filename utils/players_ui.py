@@ -6,7 +6,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from .players import get_players_normalized
+from .players import get_players_enriched, get_players_normalized
 from .models import PlayerInfo
 from .ui_helpers import select_league_and_season, select_team
 from .widgets import render_widget
@@ -58,12 +58,27 @@ def show_players(
         st.info("Choisissez une equipe pour afficher l'effectif.")
         return
 
-    page = st.number_input(
-        "Page API (20 joueurs par page)", min_value=1, max_value=50, value=1, step=1
+    use_enriched = st.checkbox(
+        "Fusionner avec les lineups les plus récents",
+        value=True,
+        help="Ajoute les joueurs détectés dans les dernières feuilles de match (titularisations + remplaçants).",
     )
+    if not use_enriched:
+        page = st.number_input(
+            "Page API (20 joueurs par page)",
+            min_value=1,
+            max_value=50,
+            value=1,
+            step=1,
+        )
+    else:
+        st.caption("Effectif complet construit à partir de l'API Players et des derniers lineups.")
 
     with st.spinner("Chargement des joueurs..."):
-        players = get_players_normalized(league_id, season, team_id, page=int(page))
+        if use_enriched:
+            players = get_players_enriched(league_id, season, team_id)
+        else:
+            players = get_players_normalized(league_id, season, team_id, page=int(page))
 
     if not players:
         st.warning("Aucun joueur trouve pour cette selection.")

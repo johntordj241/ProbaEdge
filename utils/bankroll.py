@@ -29,6 +29,8 @@ class BankrollSettings:
     default_odds: float
     min_stake: float
     max_stake: float
+    profile_id: Optional[str] = None
+    profile_name: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Optional[Dict[str, Any]]) -> "BankrollSettings":
@@ -44,6 +46,8 @@ class BankrollSettings:
             default_odds=float(max(1.01, source.get("default_odds", 1.01))),
             min_stake=float(max(0.0, source.get("min_stake", 0.0))),
             max_stake=float(max(0.0, source.get("max_stake", 0.0))),
+            profile_id=str(source.get("profile_id") or source.get("id") or "") or None,
+            profile_name=str(source.get("profile_name") or source.get("name") or "").strip() or None,
         )
 
 
@@ -128,13 +132,13 @@ def suggest_stake(probability: float, odds: Optional[float], settings: BankrollS
     }
 
 
-def adjust_bankroll(delta: float) -> Dict[str, Any]:
+def adjust_bankroll(delta: float, profile_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Apply a delta (positive or negative) to the persisted bankroll amount.
     Useful to debit the stake at bet placement and credit payouts once settled.
     """
     try:
-        current = dict(get_bankroll_settings())
+        current = dict(get_bankroll_settings(profile_id))
     except Exception:
         current = DEFAULT_BANKROLL.copy()
     try:
@@ -143,7 +147,8 @@ def adjust_bankroll(delta: float) -> Dict[str, Any]:
         amount = DEFAULT_BANKROLL["amount"]
     new_amount = max(0.0, amount + float(delta or 0.0))
     current["amount"] = round(new_amount, 2)
-    save_bankroll_settings(current)
+    target_profile_id = profile_id or current.get("profile_id")
+    save_bankroll_settings(current, profile_id=target_profile_id)
     return current
 
 
@@ -154,4 +159,3 @@ __all__ = [
     "suggest_stake",
     "adjust_bankroll",
 ]
-

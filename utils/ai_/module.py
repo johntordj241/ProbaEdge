@@ -21,6 +21,13 @@ SYSTEM_PROMPT = (
     "3) risques à surveiller (blessures, météo, discipline). Tu ne donnes pas de conseils financiers "
     "et tu rappelles de comparer les cotes."
 )
+COMMENTATOR_PROMPT = (
+    "Tu es le commentateur TV officiel de Proba Edge, en direct sur un match de football. "
+    "Tu gardes un ton dynamique, professionnel et en francais moderne. "
+    "Tu restitues l'ambiance, le score, les faits marquants (cartons, blessures, penalties) "
+    "et relies ces elements aux statistiques fournies (tirs cadres, xG, possession, intensite). "
+    "Tu ne donnes jamais de conseils financiers."
+)
 MAX_INPUT_CHARS = 6000
 
 
@@ -104,22 +111,48 @@ def _call_chat_completion(messages: list[dict[str, str]], *, model: str) -> str:
         raise AIAnalysisError(f"Réponse OpenAI inattendue : {completion}") from exc
 
 
-def analyse_match_with_ai(match_data: Mapping[str, Any], *, model: str = "gpt-4o-mini") -> str:
+def _friendly_openai_error(exc: Exception) -> AIAnalysisError:
+    message = str(exc)
+    lowered = message.lower()
+    auth_tokens = [
+        "incorrect api key",
+        "invalid api key",
+        "api key provided",
+        "authentication",
+        "401",
+    ]
+    if any(token in lowered for token in auth_tokens):
+        return AIAnalysisError(
+            "Clé OpenAI refusée (401). Vérifie OPENAI_API_KEY dans ton fichier .env ou régénère une clé valide "
+            "depuis https://platform.openai.com/account/api-keys, puis relance l'application."
+        )
+    return AIAnalysisError(f"Impossible d'interroger OpenAI : {exc}")
+
+
+def analyse_match_with_ai(
+    match_data: Mapping[str, Any],
+    *,
+    model: str = "gpt-4o-mini",
+    instruction: str | None = None,
+) -> str:
     """
     Analyse un match via OpenAI à partir d'un dictionnaire de contexte/faits (probabilités en %).
     """
     summary = _compact_payload(match_data)
+    user_content = (
+        "Analyse ces données JSON (probabilités en %) et fournis trois puces : "
+        "1) dynamique / score probable, 2) opportunité ou edge potentiel, "
+        "3) risques ou facteurs de prudence. "
+        "Rappelle de vérifier les cotes avant d'agir.\n"
+        f"{summary}"
+    )
+    if instruction:
+        user_content += f"\nContexte supplémentaire : {instruction}"
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {
             "role": "user",
-            "content": (
-                "Analyse ces données JSON (probabilités en %) et fournis trois puces : "
-                "1) dynamique / score probable, 2) opportunité ou edge potentiel, "
-                "3) risques ou facteurs de prudence. "
-                "Rappelle de vérifier les cotes avant d'agir.\n"
-                f"{summary}"
-            ),
+            "content": user_content,
         },
     ]
     try:
@@ -127,7 +160,42 @@ def analyse_match_with_ai(match_data: Mapping[str, Any], *, model: str = "gpt-4o
     except AIAnalysisError:
         raise
     except Exception as exc:  # pragma: no cover - dépendance externe
-        raise AIAnalysisError(f"Impossible d'interroger OpenAI : {exc}") from exc
+        raise _friendly_openai_error(exc) from exc
 
 
-__all__ = ["analyse_match_with_ai", "is_openai_configured", "AIAnalysisError"]
+
+def commentate_match_with_ai(
+    match_data: Mapping[str, Any],
+    *,
+    model: str = "gpt-4o-mini",
+    instruction: str | None = None,
+) -> str:
+    """
+    Produit un commentaire live facon TV a partir du meme socle de donnees JSON.
+    """
+    summary = _compact_payload(match_data)
+    user_content = (
+        "Decris le match comme un commentateur TV en deux courts paragraphes : "
+        "1) l'ambiance en direct (minute, score, intensite, incidents) ; "
+        "2) l'analyse tactique/statistique (tirs cadres, xG, possession, cartons, pression). "
+        "Cite explicitement les chiffres importants et termine par une phrase qui projette la suite du match.\n"
+        f"{summary}"
+    )
+    if instruction:
+        user_content += f"\nConsigne supplementaire : {instruction}"
+    messages = [
+        {"role": "system", "content": COMMENTATOR_PROMPT},
+        {
+            "role": "user",
+            "content": user_content,
+        },
+    ]
+    try:
+        return _call_chat_completion(messages, model=model)
+    except AIAnalysisError:
+        raise
+    except Exception as exc:  # pragma: no cover
+        raise _friendly_openai_error(exc) from exc
+
+
+__all__ = ["analyse_match_with_ai", "commentate_match_with_ai", "is_openai_configured", "AIAnalysisError"]

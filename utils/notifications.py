@@ -9,6 +9,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import requests
 
+from .profile import DEFAULT_ALERT_SETTINGS, get_alert_settings
 from .secrets import get_secret, PROJECT_ROOT
 
 SEVERITY_BADGES = {
@@ -19,11 +20,34 @@ SEVERITY_BADGES = {
 
 DEFAULT_TTL_SECONDS = 900
 LOG_FILE = PROJECT_ROOT / "data" / "notifications.log"
+CHANNEL_FLAG_KEYS = (
+    "channel_slack",
+    "channel_discord",
+    "channel_email",
+    "channel_webhook",
+    "channel_telegram",
+    "channel_x",
+)
 
 
 def _ensure_log_file() -> Path:
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     return LOG_FILE
+
+
+def _channel_preferences() -> Dict[str, bool]:
+    try:
+        settings = get_alert_settings()
+    except Exception:
+        settings = {}
+    prefs: Dict[str, bool] = {}
+    for key in CHANNEL_FLAG_KEYS:
+        default = DEFAULT_ALERT_SETTINGS.get(
+            key,
+            True if key in {"channel_slack", "channel_discord"} else False,
+        )
+        prefs[key] = bool(settings.get(key, default))
+    return prefs
 
 
 class NotificationManager:
@@ -71,13 +95,41 @@ class NotificationManager:
             "extra": extra or {},
         }
         self._log_locally(payload)
+        channel_prefs = _channel_preferences()
+        try:
+            from .engagement import broadcast_notification_payload  # lazy import to avoid cycles
+        except Exception:
+            broadcast_notification_payload = None  # type: ignore
 
-        if not self.has_channel():
+        has_primary_channel = (
+            (self.slack_webhook and channel_prefs.get("channel_slack", True))
+            or (self.discord_webhook and channel_prefs.get("channel_discord", True))
+        )
+        if not has_primary_channel:
+            if broadcast_notification_payload:
+                try:
+                    return broadcast_notification_payload(payload, channels=channel_prefs)
+                except Exception:
+                    return False
             return False
 
-        slack_ok = self._send_slack(payload) if self.slack_webhook else False
-        discord_ok = self._send_discord(payload) if self.discord_webhook else False
-        return slack_ok or discord_ok
+        slack_ok = (
+            self._send_slack(payload)
+            if self.slack_webhook and channel_prefs.get("channel_slack", True)
+            else False
+        )
+        discord_ok = (
+            self._send_discord(payload)
+            if self.discord_webhook and channel_prefs.get("channel_discord", True)
+            else False
+        )
+        engagement_ok = False
+        if broadcast_notification_payload:
+            try:
+                engagement_ok = broadcast_notification_payload(payload, channels=channel_prefs)
+            except Exception:
+                engagement_ok = False
+        return slack_ok or discord_ok or engagement_ok
 
     def _send_slack(self, payload: Dict[str, Any]) -> bool:
         text = self._format_text(payload)

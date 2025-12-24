@@ -1,7 +1,7 @@
 {
   "custom_bookmakers": [],
   "bankroll": {
-    "amount": 163.52,
+    "amount": 300.0,
     "strategy": "kelly",
     "flat_stake": 5.0,
     "percent": 2.0,
@@ -10,16 +10,220 @@
     "min_stake": 1.0,
     "max_stake": 100.0
   },
-  "favorite_competitions": [],
+  "favorite_competitions": [
+    {
+      "league_id": 61,
+      "season": 2025,
+      "label": "Ligue 1 (France)",
+      "country": "France",
+      "type": "League",
+      "categories": [
+        "Senior"
+      ],
+      "query": ""
+    },
+    {
+      "league_id": 62,
+      "season": 2025,
+      "label": "Ligue 2 (France)",
+      "country": "France",
+      "type": "League",
+      "categories": [
+        "Senior"
+      ],
+      "query": ""
+    },
+    {
+      "league_id": 5,
+      "season": 2024,
+      "label": "UEFA Nations League (World)",
+      "country": "World",
+      "type": "Cup",
+      "categories": [
+        "Senior"
+      ],
+      "query": ""
+    },
+    {
+      "league_id": 39,
+      "season": 2025,
+      "label": "Premier League (Angleterre)",
+      "country": "Angleterre",
+      "type": "League",
+      "categories": [
+        "Senior"
+      ],
+      "query": ""
+    },
+    {
+      "league_id": 140,
+      "season": 2025,
+      "label": "La Liga (Espagne)",
+      "country": "Espagne",
+      "type": "League",
+      "categories": [
+        "Senior"
+      ],
+      "query": ""
+    },
+    {
+      "league_id": 135,
+      "season": 2025,
+      "label": "Serie A (Italie)",
+      "country": "Italie",
+      "type": "League",
+      "categories": [
+        "Senior"
+      ],
+      "query": ""
+    },
+    {
+      "league_id": 136,
+      "season": 2025,
+      "label": "Serie B (Italie)",
+      "country": "Italie",
+      "type": "League",
+      "categories": [
+        "Senior"
+      ],
+      "query": ""
+    },
+    {
+      "league_id": 2,
+      "season": 2025,
+      "label": "UEFA Champions League (World)",
+      "country": "World",
+      "type": "Cup",
+      "categories": [
+        "Senior"
+      ],
+      "query": ""
+    },
+    {
+      "league_id": 3,
+      "season": 2025,
+      "label": "UEFA Europa League (World)",
+      "country": "World",
+      "type": "Cup",
+      "categories": [
+        "Senior"
+      ],
+      "query": ""
+    },
+    {
+      "league_id": 78,
+      "season": 2025,
+      "label": "Bundesliga (Allemagne)",
+      "country": "Allemagne",
+      "type": "League",
+      "categories": [
+        "Senior"
+      ],
+      "query": ""
+    },
+    {
+      "league_id": 6,
+      "season": 2025,
+      "label": "Africa Cup of Nations (World)",
+      "country": "World",
+      "type": "Cup",
+      "categories": [
+        "Senior"
+      ],
+      "query": ""
+    },
+    {
+      "league_id": 45,
+      "season": 2025,
+      "label": "FA Cup (Angleterre)",
+      "country": "Angleterre",
+      "type": "Cup",
+      "categories": [
+        "Senior"
+      ],
+      "query": ""
+    },
+    {
+      "league_id": 772,
+      "season": 2025,
+      "label": "Leagues Cup (World)",
+      "country": "World",
+      "type": "Cup",
+      "categories": [
+        "Senior"
+      ],
+      "query": ""
+    }
+  ],
   "intensity_weights": {
     "xg": 0.45,
     "over": 0.35,
     "btts": 0.2
   },
   "ui_defaults": {
-    "league_id": null,
-    "season": null,
-    "bookmakers": [],
-    "horizon_days": 1
-  }
+    "league_id": 39,
+    "season": 2025,
+    "bookmakers": [
+      "Betclic",
+      "ParionsSport"
+    ],
+    "horizon_days": 7
+  },
+  "ai_preferences": {
+    "analysis_instruction": "“Souligne les scénarios de cash-out et les risques disciplinaires” ou “Répète toujours les probabilités clé + edge estimé”.",
+    "commentator_instruction": "“Ton radio tactique, insiste sur les changements de pressing et les cartons” ou “Style consultant TV avec focus sur la gestion du score”.",
+    "commentator_enabled": true
+  },
+  "bankroll_profiles": [
+    {
+      "id": "default",
+      "name": "Profil principal",
+      "settings": {
+        "amount": 300.0,
+        "strategy": "kelly",
+        "flat_stake": 5.0,
+        "percent": 2.0,
+        "kelly_fraction": 0.5,
+        "default_odds": 2.0,
+        "min_stake": 1.0,
+        "max_stake": 100.0
+      },
+      "active": true
+    }
+  ],
+  "active_bankroll_profile_id": "default",
+  "alert_settings": {
+    "edge_threshold_pct": 7.5,
+    "edge_dedup_minutes": 45,
+    "cashout_alert_enabled": true,
+    "context_alert_enabled": true,
+    "cashout_dedup_minutes": 20,
+    "channel_slack": true,
+    "channel_discord": true,
+    "channel_email": false,
+    "channel_webhook": false,
+    "channel_telegram": false,
+    "channel_x": false
+  },
+  "saved_scenes": [
+    {
+      "id": "br_7a5b2d09",
+      "name": "1347244",
+      "config": {
+        "league_id": 61,
+        "season": 2025,
+        "team_id": null,
+        "scope": "A venir",
+        "limit": 30,
+        "highlight_threshold_pts": 4,
+        "over_filters_enabled": false,
+        "over_thresholds": {},
+        "under_filters_enabled": false,
+        "under_min_prob": null,
+        "under_limit_intensity": false,
+        "under_max_intensity": 65
+      },
+      "updated_at": "2025-12-23T18:28:07.470561"
+    }
+  ]
 }

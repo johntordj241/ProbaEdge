@@ -1,0 +1,11 @@
+{
+  "users": [
+    {
+      "email": "john.tordjeman@gmail.com",
+      "password": "ad40f97e73a7649ac1ae38bd35db1154e6c73dd073305055ca763b879b1d4926",
+      "salt": "1b14c89e2816dede2a279dd24ef139c8",
+      "name": "john tordjeman",
+      "created_at": "2025-12-16T19:53:03.324882+00:00"
+    }
+  ]
+}

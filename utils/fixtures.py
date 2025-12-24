@@ -14,7 +14,8 @@ import streamlit as st
 
 
 
-from .api_calls import get_fixtures
+from .api_calls import get_fixtures, get_standings
+from .events import load_fixture_events, format_event_line
 
 from .ui_helpers import select_league_and_season, select_team
 
@@ -34,6 +35,26 @@ LOCAL_TZ = ZoneInfo("Europe/Paris")
 
 FORM_LABELS = {"W": "V", "V": "V", "L": "D", "D": "N", "N": "N"}
 FORM_CLASSES = {"W": "win", "V": "win", "L": "loss", "D": "draw", "N": "draw"}
+@st.cache_data(ttl=300, show_spinner=False)
+def _team_form_lookup(league_id: int, season: int) -> Dict[int, str]:
+    standings_payload = get_standings(league_id, season) or []
+    if not isinstance(standings_payload, list) or not standings_payload:
+        return {}
+    table = (
+        standings_payload[0]
+        .get("league", {})
+        .get("standings", [[]])[0]
+    )
+    forms: Dict[int, str] = {}
+    for entry in table:
+        if not isinstance(entry, dict):
+            continue
+        team = entry.get("team") or {}
+        team_id = team.get("id")
+        form = entry.get("form")
+        if team_id and form:
+            forms[int(team_id)] = str(form)
+    return forms
 
 
 def _form_badges_html(form: Optional[str]) -> str:
@@ -108,7 +129,7 @@ def _status_badge(status: Dict[str, Any]) -> str:
 
 
 
-def _render_fixture(match: Fixture) -> None:
+def _render_fixture(match: Fixture, team_forms: Optional[Dict[int, str]] = None) -> None:
 
     fixture_info = match.get("fixture", {})
 
@@ -128,9 +149,9 @@ def _render_fixture(match: Fixture) -> None:
 
 
 
-    home_name = home.get("name") or "Équipe A"
+    home_name = home.get("name") or "Equipe A"
 
-    away_name = away.get("name") or "Équipe B"
+    away_name = away.get("name") or "Equipe B"
 
 
 
@@ -184,9 +205,15 @@ def _render_fixture(match: Fixture) -> None:
         col_home.image(home["logo"], width=72)
 
     col_home.markdown(f"**{home_name}**")
-    col_home.caption("🏠 Domicile")
-    home_form_badges = _form_badges_html(home.get("form"))
+    col_home.caption("Domicile")
+    home_form_value = None
+    if team_forms:
+        team_id = home.get("id")
+        if team_id is not None:
+            home_form_value = team_forms.get(int(team_id))
+    home_form_badges = _form_badges_html(home_form_value or home.get("form"))
     if home_form_badges:
+        col_home.caption("Forme (5 derniers)")
         col_home.markdown(home_form_badges, unsafe_allow_html=True)
 
 
@@ -211,10 +238,25 @@ def _render_fixture(match: Fixture) -> None:
         col_away.image(away["logo"], width=72)
 
     col_away.markdown(f"**{away_name}**")
-    col_away.caption("✈️ Extérieur")
-    away_form_badges = _form_badges_html(away.get("form"))
+    col_away.caption("Extérieur")
+    away_form_value = None
+    if team_forms:
+        team_id = away.get("id")
+        if team_id is not None:
+            away_form_value = team_forms.get(int(team_id))
+    away_form_badges = _form_badges_html(away_form_value or away.get("form"))
     if away_form_badges:
+        col_away.caption("Forme (5 derniers)")
         col_away.markdown(away_form_badges, unsafe_allow_html=True)
+
+    show_events = fixture_info.get("status", {}).get("short") in (LIVE_STATUS | FINISHED_STATUS)
+    fixture_id = fixture_info.get("id")
+    if show_events and fixture_id:
+        events = load_fixture_events(int(fixture_id))
+        if events:
+            st.caption("Buteurs & cartons")
+            for ev in events:
+                st.markdown(format_event_line(ev), unsafe_allow_html=True)
 
 
 
@@ -456,13 +498,15 @@ def show_matches(
 
 
 
+    team_forms = _team_form_lookup(league_id, season) if fixtures else {}
+
     for match in fixtures:
 
         if not isinstance(match, dict):
 
             continue
 
-        _render_fixture(match)
+        _render_fixture(match, team_forms=team_forms)
 
         st.divider()
 

@@ -1,0 +1,2 @@
+{'OPENAI_API_KEY': False}
+{'is_openai_configured': True}

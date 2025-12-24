@@ -2,11 +2,12 @@ from __future__ import annotations
 
 
 
-from datetime import datetime
+from datetime import date, datetime
 
 from typing import Any, Dict, List, Optional, Tuple
 
 from zoneinfo import ZoneInfo
+from textwrap import dedent
 
 
 
@@ -20,6 +21,8 @@ import streamlit as st
 
 from .api_calls import (
     get_fixtures,
+    get_fixtures_by_date,
+    get_fixture_statistics,
     get_injuries,
     get_odds,
     get_odds_by_fixture,
@@ -48,12 +51,201 @@ from .prediction_model import (
 )
 
 from .ui_helpers import load_leagues, select_team
+from .profile import list_saved_scenes
 
 from .widgets import render_widget
+from .form_utils import form_badges_html, FORM_STYLE
+from .events import load_fixture_events, format_event_line
 
 
 
 LOCAL_TZ = ZoneInfo("Europe/Paris")
+
+TEAM_FORM_STYLE = dedent(
+    """\
+    <style>
+    .team-form {
+        margin-top: 8px;
+    }
+    .team-form small {
+        display: block;
+        color: rgba(255,255,255,0.7);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 4px;
+    }
+    </style>
+    """
+)
+
+LIVE_EVENT_STATUS = {"LIVE", "1H", "2H", "ET", "P", "BT", "HT", "INT", "INP", "FT", "AET", "PEN", "CANC", "ABD", "AWD"}
+
+
+def _format_local_time(raw_iso: Any) -> str:
+    if not raw_iso:
+        return "-"
+    try:
+        dt_obj = datetime.fromisoformat(str(raw_iso).replace("Z", "+00:00"))
+        return dt_obj.astimezone(LOCAL_TZ).strftime("%H:%M")
+    except Exception:
+        return "-"
+
+
+def _format_local_datetime(raw_iso: Any) -> str:
+    if not raw_iso:
+        return "-"
+    try:
+        dt_obj = datetime.fromisoformat(str(raw_iso).replace("Z", "+00:00"))
+        return dt_obj.astimezone(LOCAL_TZ).strftime("%d/%m %H:%M")
+    except Exception:
+        return "-"
+
+
+def _worldwide_rows(fixtures: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    rows: List[Dict[str, str]] = []
+    for entry in fixtures or []:
+        teams_block = entry.get("teams") or {}
+        fixture_block = entry.get("fixture") or {}
+        league_block = entry.get("league") or {}
+        rows.append(
+            {
+                "Date": _format_local_datetime(fixture_block.get("date")),
+                "Match": f"{teams_block.get('home', {}).get('name', 'Equipe A')} vs "
+                f"{teams_block.get('away', {}).get('name', 'Equipe B')}",
+                "Competition": league_block.get("name", ""),
+                "Pays": league_block.get("country", ""),
+            }
+        )
+    return rows
+
+
+def _matches_of_the_day_rows(fixtures: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    rows: List[Dict[str, str]] = []
+    for entry in fixtures or []:
+        teams_block = entry.get("teams") or {}
+        home_team = teams_block.get("home") or {}
+        away_team = teams_block.get("away") or {}
+        fixture_block = entry.get("fixture") or {}
+        status_block = fixture_block.get("status") or {}
+        league_block = entry.get("league") or {}
+        rows.append(
+            {
+                "Heure": _format_local_time(fixture_block.get("date")),
+                "Match": f"{home_team.get('name', 'Equipe A')} vs {away_team.get('name', 'Equipe B')}",
+                "Competition": league_block.get("name", ""),
+                "Statut": status_block.get("long") or status_block.get("short") or "Programme",
+            }
+        )
+    return rows
+
+
+def _upcoming_rows(fixtures: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    rows: List[Dict[str, str]] = []
+    for entry in fixtures or []:
+        teams_block = entry.get("teams") or {}
+        fixture_block = entry.get("fixture") or {}
+        league_block = entry.get("league") or {}
+        rows.append(
+            {
+                "Date": _format_local_datetime(fixture_block.get("date")),
+                "Match": f"{teams_block.get('home', {}).get('name', 'Equipe A')} vs "
+                f"{teams_block.get('away', {}).get('name', 'Equipe B')}",
+                "Competition": league_block.get("name", ""),
+            }
+        )
+    return rows
+
+
+def _normalize_stat_label(raw: Any) -> str:
+    import unicodedata
+
+    text = unicodedata.normalize("NFKD", str(raw or "").strip())
+    ascii_text = "".join(ch for ch in text if ord(ch) < 128)
+    return "".join(ch for ch in ascii_text.lower() if ch.isalnum())
+
+
+STAT_LABEL_ALIASES: Dict[str, set[str]] = {
+    "shotsongoal": {"shotsongoal", "shotsontarget", "tirscadres", "tirscadre", "shotsatgoal"},
+    "totalshots": {"totalshots", "tirstotaux", "shotstotal"},
+    "ballpossession": {"ballpossession", "possession", "possessiondeballe"},
+    "expectedgoals": {"expectedgoals", "xg", "butsattendus"},
+    "cornerkicks": {"cornerkicks", "corners"},
+}
+
+
+def _stat_label_variants(label: str) -> set[str]:
+    normalized = _normalize_stat_label(label)
+    variants = {normalized}
+    for key, entries in STAT_LABEL_ALIASES.items():
+        if normalized == key or normalized in entries:
+            variants.update({key, *entries})
+            break
+    return variants
+
+
+def _stat_value(statistics: List[Dict[str, Any]], team_id: Optional[int], label: str) -> Optional[float]:
+    if team_id is None:
+        return None
+    targets = _stat_label_variants(label)
+    for block in statistics or []:
+        team_block = block.get("team") or {}
+        if team_block.get("id") != team_id:
+            continue
+        for entry in block.get("statistics") or []:
+            stat_label = _normalize_stat_label(entry.get("type"))
+            if stat_label not in targets:
+                continue
+            value = entry.get("value")
+            if value in {None, "", "-"}:
+                return None
+            try:
+                raw = str(value).strip().replace(",", ".")
+                if raw.endswith("%"):
+                    return float(raw[:-1]) / 100.0
+                return float(raw)
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def _highlight_stat_lines(
+    statistics: List[Dict[str, Any]],
+    home_id: Optional[int],
+    away_id: Optional[int],
+) -> List[Dict[str, Any]]:
+    metrics = [
+        ("Tirs cadrés", "Shots on Goal"),
+        ("Tirs totaux", "Total Shots"),
+        ("xG cumulés", "Expected Goals"),
+        ("Possession", "Ball Possession"),
+        ("Corners", "Corner Kicks"),
+    ]
+    rows: List[Dict[str, Any]] = []
+    for label, key in metrics:
+        home_value = _stat_value(statistics, home_id, key)
+        away_value = _stat_value(statistics, away_id, key)
+        if home_value is None and away_value is None:
+            continue
+        if label == "Possession":
+            to_pct = lambda val: f"{val * 100:.0f}%" if val is not None else "-"
+            home_display = to_pct(home_value)
+            away_display = to_pct(away_value)
+        else:
+            fmt = lambda val: f"{val:.2f}" if isinstance(val, float) and not val.is_integer() else f"{int(val)}"
+            home_display = fmt(home_value) if home_value is not None else "-"
+            away_display = fmt(away_value) if away_value is not None else "-"
+        rows.append({"Stat": label, "Domicile": home_display, "Extérieur": away_display})
+    return rows
+
+
+def _injured_name_set(payload: Optional[List[Dict[str, Any]]]) -> set[str]:
+    names: set[str] = set()
+    for item in payload or []:
+        player = (item.get("player") or {}).get("name")
+        if player:
+            names.add(player)
+    return names
 
 
 
@@ -100,6 +292,38 @@ def _highlight_fixture(fixtures: List[Dict[str, Any]]) -> Optional[Dict[str, Any
     upcoming = [fx for fx in fixtures if fx.get("fixture", {}).get("status", {}).get("short") not in {"FT", "AET", "PEN"}]
 
     return upcoming[0] if upcoming else fixtures[0]
+
+
+def _form_rows_for_teams(
+    standings: List[Dict[str, Any]],
+    teams: List[Dict[str, Any]],
+) -> List[Dict[str, str]]:
+    rows: List[Dict[str, str]] = []
+    if not standings or not teams:
+        return rows
+    for team in teams:
+        if not team:
+            continue
+        team_id = team.get("id")
+        name = team.get("name") or f"Equipe {team_id or '?'}"
+        entry = None
+        if team_id is not None:
+            entry = next(
+                (row for row in standings if row.get("team", {}).get("id") == team_id),
+                None,
+            )
+        if not entry and name:
+            entry = next(
+                (
+                    row
+                    for row in standings
+                    if row.get("team", {}).get("name") == name
+                ),
+                None,
+            )
+        form_value = (entry.get("form") if entry else "") or ""
+        rows.append({"team": name, "form": form_value})
+    return rows
 
 
 
@@ -345,6 +569,34 @@ def show_dashboard(
 
     st.title("Dashboard Paris Sportifs")
 
+    saved_scenes = list_saved_scenes()
+    scene_defaults_config = st.session_state.pop("_dashboard_scene_to_apply", None)
+    sidebar_scene_options = [{"id": "", "name": "Aucune scène", "config": {}}] + saved_scenes
+    sidebar_scene_labels = [entry["name"] or "Scène" for entry in sidebar_scene_options]
+    current_sidebar_scene_id = st.session_state.get("_dashboard_scene_current", "")
+    try:
+        sidebar_default_index = next(
+            idx for idx, entry in enumerate(sidebar_scene_options) if entry["id"] == current_sidebar_scene_id
+        )
+    except StopIteration:
+        sidebar_default_index = 0
+    sidebar_choice = st.sidebar.selectbox(
+        "Scène rapide (dashboard)",
+        options=list(range(len(sidebar_scene_options))),
+        index=sidebar_default_index,
+        format_func=lambda idx: sidebar_scene_labels[idx],
+        key="dashboard_scene_select",
+    )
+    selected_sidebar_scene = sidebar_scene_options[sidebar_choice]
+    if selected_sidebar_scene.get("id"):
+        if selected_sidebar_scene["id"] != current_sidebar_scene_id:
+            st.session_state["_dashboard_scene_to_apply"] = selected_sidebar_scene.get("config", {})
+            st.session_state["_dashboard_scene_current"] = selected_sidebar_scene["id"]
+            st.experimental_rerun()
+    else:
+        if current_sidebar_scene_id:
+            st.session_state["_dashboard_scene_current"] = ""
+
 
 
     leagues = load_leagues()
@@ -353,22 +605,35 @@ def show_dashboard(
 
         st.error("Impossible de charger les competitions (cle API / reseau ?)")
 
+        if st.button("Reessayer la recuperation", key="dashboard_retry_leagues"):
+
+            try:
+
+                load_leagues.clear()  # type: ignore[attr-defined]
+
+            except Exception:
+
+                pass
+
+            st.experimental_rerun()
+
+        st.caption(
+
+            "Verifie API_FOOTBALL_KEY, la connectivite et purge le cache si besoin (bouton dans le panneau lateral)."
+
+        )
+
         return
 
 
 
     league_labels = [item["label"] for item in leagues]
-
+    pref_league_id = scene_defaults_config.get("league_id") if scene_defaults_config else default_league_id
     default_idx = 0
-
-    if default_league_id:
-
+    if pref_league_id:
         for idx, item in enumerate(leagues):
-
-            if item["id"] == default_league_id:
-
+            if item["id"] == pref_league_id:
                 default_idx = idx
-
                 break
 
 
@@ -384,10 +649,9 @@ def show_dashboard(
 
 
     seasons = selected_league.get("seasons") or [default_season or 2025]
-
     seasons = sorted(seasons, reverse=True)
-
-    default_season_value = default_season or selected_league.get("current_season") or seasons[0]
+    preferred_season = scene_defaults_config.get("season") if scene_defaults_config else default_season
+    default_season_value = preferred_season or selected_league.get("current_season") or seasons[0]
 
     with col_season:
 
@@ -399,27 +663,27 @@ def show_dashboard(
 
 
 
+    preferred_team = scene_defaults_config.get("team_id") if scene_defaults_config else default_team_id
     team_id = select_team(
-
         league_id,
-
         season,
-
-        default_team_id=default_team_id,
-
+        default_team_id=preferred_team,
         placeholder="Toutes les equipes",
-
         key=f"dashboard_team_{league_id}_{season}",
-
     )
 
 
+
+    today_rows: List[Dict[str, str]] = []
+    world_rows: List[Dict[str, str]] = []
 
     with st.spinner("Chargement des donnees live..."):
 
         live_fixtures = get_fixtures(league_id, season, team_id=team_id, live="all") or []
 
         upcoming_fixtures = get_fixtures(league_id, season, team_id=team_id, next_n=6) or []
+
+        league_upcoming = get_fixtures(league_id, season, next_n=6) or []
 
         standings_raw = get_standings(league_id, season) or []
 
@@ -429,9 +693,62 @@ def show_dashboard(
 
             standings = standings_raw[0].get("league", {}).get("standings", [[]])[0]
 
+        today_payload = get_fixtures_by_date(
+            date.today().isoformat(),
+            timezone="Europe/Paris",
+            league_id=league_id,
+        ) or []
+        today_rows = _matches_of_the_day_rows(today_payload)
+        world_payload = get_fixtures_by_date(
+            date.today().isoformat(),
+            timezone="Europe/Paris",
+        ) or []
+        world_rows = _worldwide_rows(world_payload)
 
 
-    highlight = _highlight_fixture(live_fixtures + upcoming_fixtures)
+
+    candidate_fixtures = live_fixtures + upcoming_fixtures
+    highlight = _highlight_fixture(candidate_fixtures)
+
+    st.markdown("### Matches du monde (toutes competitions)")
+    world_filter = st.text_input("Filtrer (club, competition, pays)", key="dashboard_world_filter")
+    filtered_world = world_rows
+    if world_filter:
+        needle = world_filter.lower()
+        filtered_world = [
+            row
+            for row in world_rows
+            if needle in (row.get("Match", "").lower())
+            or needle in (row.get("Competition", "").lower())
+            or needle in (row.get("Pays", "").lower())
+        ]
+    if filtered_world:
+        st.dataframe(pd.DataFrame(filtered_world), hide_index=True, use_container_width=True)
+    else:
+        st.info("Aucun match ne correspond au filtre ou la date ne comporte pas de rencontre connue.")
+
+    st.markdown("### Matchs du jour")
+    if today_rows:
+        st.dataframe(pd.DataFrame(today_rows), hide_index=True, use_container_width=True)
+    else:
+        fallback_source = upcoming_fixtures or league_upcoming or []
+        fallback_rows = _upcoming_rows(fallback_source[:5])
+        if fallback_rows:
+            st.warning("Aucun match programme aujourd'hui. Voici les prochaines rencontres a surveiller.")
+            st.dataframe(pd.DataFrame(fallback_rows), hide_index=True, use_container_width=True)
+        else:
+            st.info(
+                "Pas de calendrier disponible pour cette combinaison. Consulte l'agenda ou change de championnat."
+            )
+
+    widget_source = league_upcoming or candidate_fixtures
+    widget_fixture_ids: list[int] = []
+    for fx in widget_source:
+        fid = fx.get("fixture", {}).get("id")
+        if fid and fid not in widget_fixture_ids:
+            widget_fixture_ids.append(fid)
+        if len(widget_fixture_ids) == 3:
+            break
 
 
 
@@ -514,6 +831,48 @@ def show_dashboard(
                 info_parts.append(venue)
 
             st.caption(" - ".join(info_parts))
+
+            form_rows = _form_rows_for_teams(standings, [home, away])
+            if form_rows:
+                st.markdown(FORM_STYLE + TEAM_FORM_STYLE, unsafe_allow_html=True)
+                form_lookup = {row["team"]: row["form"] for row in form_rows}
+                home_form = form_lookup.get(home.get("name"))
+                away_form = form_lookup.get(away.get("name"))
+            if home_form:
+                badges = form_badges_html(home_form)
+                left.markdown(
+                    f"<div class='team-form'><small>Forme (5 derniers)</small>{badges}</div>",
+                    unsafe_allow_html=True,
+                )
+            if away_form:
+                badges = form_badges_html(away_form)
+                right.markdown(
+                    f"<div class='team-form'><small>Forme (5 derniers)</small>{badges}</div>",
+                    unsafe_allow_html=True,
+                )
+
+            fixture_id = fixture.get("id")
+            status_code = (status.get("short") or "").upper()
+            if fixture_id and status_code in LIVE_EVENT_STATUS:
+                events = load_fixture_events(int(fixture_id))
+                if events:
+                    st.markdown("**Buteurs & cartons**")
+                    for ev in events:
+                        st.markdown(format_event_line(ev), unsafe_allow_html=True)
+                try:
+                    statistics_payload = get_fixture_statistics(int(fixture_id)) or []
+                except Exception:
+                    statistics_payload = []
+                stat_rows = _highlight_stat_lines(
+                    statistics_payload,
+                    teams.get("home", {}).get("id"),
+                    teams.get("away", {}).get("id"),
+                )
+                if stat_rows:
+                    st.subheader("Statistiques live clés")
+                    st.table(pd.DataFrame(stat_rows), use_container_width=True)
+                else:
+                    st.caption("Statistiques live indisponibles pour ce match.")
 
         else:
 
@@ -611,6 +970,8 @@ def show_dashboard(
             )
             injuries_home = get_injuries(league_id, season, teams.get("home", {}).get("id")) or []
             injuries_away = get_injuries(league_id, season, teams.get("away", {}).get("id")) or []
+            injured_home_names = _injured_name_set(injuries_home)
+            injured_away_names = _injured_name_set(injuries_away)
 
         col_odds, col_inj = st.columns([1, 1])
         with col_odds:
@@ -654,6 +1015,8 @@ def show_dashboard(
             top_scorers,
             players_home,
             players_away,
+            injured_home=injured_home_names,
+            injured_away=injured_away_names,
         )
 
         st.subheader("Buteurs probables")
@@ -684,23 +1047,26 @@ def show_dashboard(
             else:
                 st.info("Pas assez de donnees pour les buteurs probables.")
 
-        if fixture_id:
-            st.markdown("---")
-            st.subheader("Widget officiel - Match")
-            render_widget("game", height=620, game_id=fixture_id, config={"refresh": 60})
     else:
 
         st.info("Selectionnez un championnat comportant des matchs pour la periode choisie.")
 
-
+    if widget_fixture_ids:
+        st.markdown("---")
+        title = "Widget officiel - Matchs" if len(widget_fixture_ids) > 1 else "Widget officiel - Match"
+        st.subheader(title)
+        columns = st.columns(len(widget_fixture_ids))
+        widget_height = 240
+        for col, fixture_id in zip(columns, widget_fixture_ids):
+            with col:
+                render_widget(
+                    "game",
+                    height=widget_height,
+                    game_id=fixture_id,
+                    config={"refresh": 60, "height": widget_height},
+                )
 
     if league_id and season:
         st.markdown("---")
         st.subheader("Widget officiel - Classement complet")
         render_widget("standings", height=720, league=league_id, season=season)
-
-
-
-
-
-

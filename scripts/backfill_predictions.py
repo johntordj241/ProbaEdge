@@ -125,7 +125,11 @@ def backfill(league_id: int, season: int, *, last: int) -> int:
         horizon = predictions[0] if isinstance(predictions, list) and predictions else None
         if not isinstance(horizon, dict):
             continue
-        ai_prediction = horizon.get("prediction") or {}
+        ai_prediction = (
+            horizon.get("prediction")
+            or horizon.get("predictions")
+            or {}
+        )
         if not isinstance(ai_prediction, dict) or not ai_prediction:
             continue
         teams = fixture.get("teams") or {}
@@ -163,4 +167,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import requests
 import time
+import unicodedata
 from random import uniform
 
 from .config import BASE_URL, get_headers
@@ -28,6 +29,7 @@ CACHE_TTL: Dict[str, int] = {
     "fixtures": 120,
     "fixtures/statistics": 45,
     "fixtures/events": 30,
+    "fixtures/lineups": 45,
     "standings": 600,
     "teams/statistics": 600,
     "players": 600,
@@ -242,6 +244,18 @@ def get_fixtures(
     return _request("fixtures", params)
 
 
+def get_fixtures_by_date(
+    date: str,
+    *,
+    timezone: str = "UTC",
+    league_id: Optional[int] = None,
+) -> Json:
+    params: Dict[str, Any] = {"date": date, "timezone": timezone}
+    if league_id:
+        params["league"] = league_id
+    return _request("fixtures", params)
+
+
 
 def get_fixture_details(fixture_id: int) -> Json:
     return _request("fixtures", {"id": fixture_id})
@@ -253,6 +267,10 @@ def get_fixture_statistics(fixture_id: int) -> Json:
 
 def get_fixture_events(fixture_id: int) -> Json:
     return _request("fixtures/events", {"fixture": fixture_id})
+
+
+def get_lineups(fixture_id: int) -> Json:
+    return _request("fixtures/lineups", {"fixture": fixture_id})
 
 
 def get_leagues(
@@ -293,6 +311,7 @@ def get_players_for_team(
     team_id: Optional[int],
     *,
     max_pages: int = 3,
+    include_lineup_roster: bool = True,
 ) -> List[Dict[str, Any]]:
     """Fetch players for a team across several pages (20 players per page)."""
     if not team_id:
@@ -305,8 +324,23 @@ def get_players_for_team(
         collected.extend(chunk)
         if len(chunk) < 20:
             break
+    if include_lineup_roster:
+        try:
+            lineup_players = _lineup_roster_for_team(league_id, season, team_id)
+        except Exception:
+            lineup_players = []
+        if lineup_players:
+            collected = _merge_rosters(collected, lineup_players)
     return collected
 
+
+def get_team_squad(team_id: Optional[int]) -> Json:
+    """
+    Liste officielle des joueurs enregistres pour un club (endpoint players/squads).
+    """
+    if not team_id:
+        return []
+    return _request("players/squads", {"team": team_id})
 
 
 def get_statistics(league_id: int, season: int, team_id: int) -> Json:
@@ -379,15 +413,170 @@ def get_h2h(team1_id: int, team2_id: int, last: int = 10) -> Json:
     return _request("fixtures/headtohead", params)
 
 
+def _normalize_player_name(value: Any) -> Optional[str]:
+    if not value:
+        return None
+    text = unicodedata.normalize("NFKD", str(value).strip().lower())
+    ascii_text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    normalized = "".join(ch for ch in ascii_text if ch.isalnum())
+    return normalized or None
+
+
+def _player_identity(entry: Dict[str, Any]) -> Optional[str]:
+    player_block = (entry or {}).get("player") or {}
+    player_id = player_block.get("id")
+    if player_id is not None:
+        return f"id:{player_id}"
+    normalized = _normalize_player_name(player_block.get("name"))
+    if normalized:
+        return f"name:{normalized}"
+    return None
+
+
+def _build_lineup_player_entry(
+    player_block: Dict[str, Any],
+    team_block: Dict[str, Any],
+    league_id: int,
+    season: int,
+    *,
+    is_starter: bool,
+    fixture_meta: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    name = player_block.get("name")
+    if not name:
+        return None
+    minutes = 75 if is_starter else 25
+    stats_block = {
+        "team": {
+            "id": team_block.get("id"),
+            "name": team_block.get("name"),
+            "logo": team_block.get("logo"),
+        },
+        "league": {"id": league_id, "season": season},
+        "games": {
+            "appearences": 1,
+            "lineups": 1 if is_starter else 0,
+            "minutes": minutes,
+            "position": player_block.get("pos"),
+            "number": player_block.get("number"),
+        },
+        "goals": {"total": player_block.get("goals") or 0, "assists": player_block.get("assists")},
+        "shots": {"total": None, "on": None},
+        "passes": {"total": None, "key": None, "accuracy": None},
+        "tackles": {"total": None},
+        "penalty": {"scored": None, "missed": None},
+    }
+    return {
+        "player": {
+            "id": player_block.get("id"),
+            "name": name,
+            "age": player_block.get("age"),
+            "number": player_block.get("number"),
+            "photo": player_block.get("photo"),
+            "nationality": player_block.get("nationality"),
+            "injured": bool(player_block.get("injured", False)),
+        },
+        "statistics": [stats_block],
+        "meta": {
+            "source": "lineup",
+            "fixture_id": fixture_meta.get("id") if fixture_meta else None,
+            "fixture_date": fixture_meta.get("date") if fixture_meta else None,
+        },
+    }
+
+
+def _lineup_roster_for_team(
+    league_id: int,
+    season: int,
+    team_id: int,
+    *,
+    lookback: int = 3,
+) -> List[Dict[str, Any]]:
+    roster: List[Dict[str, Any]] = []
+    if not team_id:
+        return roster
+    fixtures = get_fixtures(league_id, season, team_id=team_id, last_n=lookback) or []
+    if not fixtures:
+        fixtures = get_fixtures(league_id, season, team_id=team_id, next_n=lookback) or []
+    seen: set[str] = set()
+    for fixture in fixtures:
+        fixture_block = fixture.get("fixture") or {}
+        fixture_id = fixture_block.get("id")
+        if not fixture_id:
+            continue
+        try:
+            lineups_payload = get_lineups(int(fixture_id)) or []
+        except Exception:
+            lineups_payload = []
+        if not isinstance(lineups_payload, list):
+            continue
+        for lineup in lineups_payload:
+            team_block = lineup.get("team") or {}
+            if team_block.get("id") != team_id:
+                continue
+            entries: List[Dict[str, Any]] = []
+            for block in lineup.get("startXI") or []:
+                entry = _build_lineup_player_entry(
+                    block.get("player") or {},
+                    team_block,
+                    league_id,
+                    season,
+                    is_starter=True,
+                    fixture_meta=fixture_block,
+                )
+                if entry:
+                    entries.append(entry)
+            for block in lineup.get("substitutes") or []:
+                entry = _build_lineup_player_entry(
+                    block.get("player") or {},
+                    team_block,
+                    league_id,
+                    season,
+                    is_starter=False,
+                    fixture_meta=fixture_block,
+                )
+                if entry:
+                    entries.append(entry)
+            if entries:
+                for entry in entries:
+                    identity = _player_identity(entry)
+                    if not identity or identity in seen:
+                        continue
+                    seen.add(identity)
+                    roster.append(entry)
+                if roster:
+                    return roster
+    return roster
+
+
+def _merge_rosters(
+    primary: List[Dict[str, Any]],
+    supplements: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    if not supplements:
+        return primary
+    merged = list(primary)
+    seen = {identity for entry in primary if (identity := _player_identity(entry))}
+    for entry in supplements:
+        identity = _player_identity(entry)
+        if not identity or identity in seen:
+            continue
+        merged.append(entry)
+        seen.add(identity)
+    return merged
+
+
 __all__ = [
     "get_fixtures",
     "get_fixture_details",
     "get_fixture_statistics",
     "get_fixture_events",
+    "get_lineups",
     "get_leagues",
     "get_standings",
     "get_players",
     "get_players_for_team",
+    "get_team_squad",
     "get_statistics",
     "get_topscorers",
     "get_topassists",
@@ -400,6 +589,3 @@ __all__ = [
     "get_h2h",
     "get_teams",
 ]
-
-
-

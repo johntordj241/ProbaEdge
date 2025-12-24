@@ -38,6 +38,25 @@ class PlayerInfo:
     rating: Optional[float]
     goals: Optional[int]
     assists: Optional[int]
+    shots_total: Optional[float]
+    shots_on: Optional[float]
+    passes_total: Optional[float]
+    passes_key: Optional[float]
+    passes_accuracy: Optional[float]
+    tackles_total: Optional[float]
+    interceptions: Optional[float]
+    duels_total: Optional[float]
+    duels_won: Optional[float]
+    dribbles_attempts: Optional[float]
+    dribbles_success: Optional[float]
+    fouls_drawn: Optional[float]
+    fouls_committed: Optional[float]
+    yellow_cards: Optional[int]
+    red_cards: Optional[int]
+    saves: Optional[float]
+    penalties_scored: Optional[float]
+    penalties_missed: Optional[float]
+    injured: bool
     raw: Dict[str, Any]
 
 
@@ -82,6 +101,27 @@ def _parse_rating(raw_rating: Any) -> Optional[float]:
         return None
 
 
+def _safe_float(value: Any) -> Optional[float]:
+    if value in {None, "", "-", "null"}:
+        return None
+    try:
+        text = str(value).strip().replace(",", ".")
+        if text.endswith("%"):
+            text = text[:-1]
+        return float(text)
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_int(value: Any) -> Optional[int]:
+    if value in {None, "", "-", "null"}:
+        return None
+    try:
+        return int(float(str(value).strip()))
+    except (TypeError, ValueError):
+        return None
+
+
 def normalize_player_entry(entry: Dict[str, Any]) -> Optional[PlayerInfo]:
     player_block = _safe_dict(entry.get("player"))
     stats_list = entry.get("statistics") if isinstance(entry.get("statistics"), list) else []
@@ -89,6 +129,14 @@ def normalize_player_entry(entry: Dict[str, Any]) -> Optional[PlayerInfo]:
     games = _safe_dict(stats.get("games"))
     goals = _safe_dict(stats.get("goals"))
     team_block = _safe_dict(stats.get("team"))
+    shots = _safe_dict(stats.get("shots"))
+    passes = _safe_dict(stats.get("passes"))
+    tackles = _safe_dict(stats.get("tackles"))
+    duels = _safe_dict(stats.get("duels"))
+    dribbles = _safe_dict(stats.get("dribbles"))
+    fouls = _safe_dict(stats.get("fouls"))
+    cards = _safe_dict(stats.get("cards"))
+    penalty = _safe_dict(stats.get("penalty"))
 
     player_id = player_block.get("id")
     name = player_block.get("name")
@@ -111,6 +159,25 @@ def normalize_player_entry(entry: Dict[str, Any]) -> Optional[PlayerInfo]:
         rating=rating,
         goals=goals.get("total"),
         assists=goals.get("assists"),
+        shots_total=_safe_float(shots.get("total")),
+        shots_on=_safe_float(shots.get("on")),
+        passes_total=_safe_float(passes.get("total")),
+        passes_key=_safe_float(passes.get("key")),
+        passes_accuracy=_safe_float(passes.get("accuracy")),
+        tackles_total=_safe_float(tackles.get("total")),
+        interceptions=_safe_float(tackles.get("interceptions")),
+        duels_total=_safe_float(duels.get("total")),
+        duels_won=_safe_float(duels.get("won")),
+        dribbles_attempts=_safe_float(dribbles.get("attempts")),
+        dribbles_success=_safe_float(dribbles.get("success")),
+        fouls_drawn=_safe_float(fouls.get("drawn")),
+        fouls_committed=_safe_float(fouls.get("committed")),
+        yellow_cards=_safe_int(cards.get("yellow")),
+        red_cards=_safe_int(cards.get("red") or cards.get("yellowred")),
+        saves=_safe_float(goals.get("saves")),
+        penalties_scored=_safe_float(penalty.get("scored")),
+        penalties_missed=_safe_float(penalty.get("missed")),
+        injured=bool(player_block.get("injured")),
         raw=entry,
     )
 

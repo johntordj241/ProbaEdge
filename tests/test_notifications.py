@@ -9,6 +9,19 @@ def test_notify_event_without_channels(tmp_path, monkeypatch):
     log_file = tmp_path / "notifications.log"
     monkeypatch.setattr(notif, "LOG_FILE", log_file)
     monkeypatch.setattr(notif, "get_secret", lambda name: "")
+    monkeypatch.setattr(
+        notif,
+        "get_alert_settings",
+        lambda: {
+            **notif.DEFAULT_ALERT_SETTINGS,
+            "channel_slack": False,
+            "channel_discord": False,
+            "channel_email": False,
+            "channel_webhook": False,
+            "channel_telegram": False,
+            "channel_x": False,
+        },
+    )
     _reset_manager()
 
     result = notif.notify_event("Titre", "Message test", dedup_key="k1")
@@ -29,6 +42,19 @@ def test_notify_event_with_channels_and_dedup(monkeypatch, tmp_path):
         return ""
 
     monkeypatch.setattr(notif, "get_secret", fake_get_secret)
+    monkeypatch.setattr(
+        notif,
+        "get_alert_settings",
+        lambda: {
+            **notif.DEFAULT_ALERT_SETTINGS,
+            "channel_slack": True,
+            "channel_discord": False,
+            "channel_email": False,
+            "channel_webhook": False,
+            "channel_telegram": False,
+            "channel_x": False,
+        },
+    )
 
     posts = []
 

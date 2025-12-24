@@ -9,23 +9,34 @@ from .profile import (
     DEFAULT_BANKROLL,
     DEFAULT_INTENSITY_WEIGHTS,
     DEFAULT_UI_DEFAULTS,
+    DEFAULT_AI_PREFERENCES,
     aliases_map,
     add_favorite_competition,
+    create_bankroll_profile,
+    delete_bankroll_profile,
     delete_bookmaker,
     get_bankroll_settings,
     get_custom_bookmakers,
     get_favorite_competitions,
     get_intensity_weights,
     get_ui_defaults,
-    remove_favorite_competition,
+    get_ai_preferences,
+    get_alert_settings,
+    list_bankroll_profiles,
     load_profile,
+    remove_favorite_competition,
+    rename_bankroll_profile,
     save_bankroll_settings,
     save_intensity_weights,
     save_profile,
     save_ui_defaults,
+    save_ai_preferences,
+    save_alert_settings,
+    set_active_bankroll_profile,
     upsert_bookmaker,
 )
 from .ui_helpers import load_leagues
+from .feedback import append_feedback, load_feedback
 from .match_filter import BOOKMAKER_PRESETS
 
 
@@ -56,11 +67,66 @@ def show_profile() -> None:
     st.caption("Personnaliser les parametres, la bankroll et definir vos bookmakers favoris.")
 
     profile = load_profile()
-    bankroll = get_bankroll_settings()
+    bankroll_profiles = list_bankroll_profiles()
+    if not bankroll_profiles:
+        st.error("Aucun profil de bankroll disponible.")
+        return
+
+    profile_ids = [entry["id"] for entry in bankroll_profiles]
+    active_index = next((idx for idx, entry in enumerate(bankroll_profiles) if entry.get("active")), 0)
+    profile_labels = {
+        entry["id"]: f"{entry['name']} {'(actif)' if entry.get('active') else ''}".strip()
+        for entry in bankroll_profiles
+    }
 
     st.subheader("Gestion de bankroll")
     help_text = "Configurez le capital disponible et la strategie de mise appliquee aux recommandations."
     with st.expander("Parametres de bankroll", expanded=True):
+        selected_profile_id = st.selectbox(
+            "Profil de bankroll",
+            options=profile_ids,
+            index=active_index,
+            format_func=lambda pid: profile_labels.get(pid, pid),
+            key="bankroll_profile_select",
+        )
+        editing_profile = next(entry for entry in bankroll_profiles if entry["id"] == selected_profile_id)
+        bankroll = get_bankroll_settings(selected_profile_id)
+        action_cols = st.columns(2)
+        if action_cols[0].button(
+            "Definir comme actif",
+            disabled=editing_profile.get("active", False),
+            key=f"activate_{selected_profile_id}",
+        ):
+            set_active_bankroll_profile(selected_profile_id)
+            st.success(f"Profil **{editing_profile['name']}** active.")
+            st.experimental_rerun()
+        if action_cols[1].button(
+            "Supprimer ce profil",
+            disabled=len(bankroll_profiles) <= 1,
+            key=f"delete_{selected_profile_id}",
+            help="Au moins un profil doit rester defini.",
+        ):
+            delete_bankroll_profile(selected_profile_id)
+            st.success("Profil supprime.")
+            st.experimental_rerun()
+
+        new_cols = st.columns([2, 1, 1])
+        new_profile_name = new_cols[0].text_input(
+            "Nom du nouveau profil",
+            placeholder="Bankroll agressive",
+            key="new_bankroll_profile_name",
+        )
+        clone_current = new_cols[1].checkbox(
+            "Cloner le profil selectionne",
+            value=True,
+            key="clone_bankroll_profile",
+        )
+        if new_cols[2].button("Ajouter un profil", key="add_bankroll_profile"):
+            template_settings = editing_profile.get("settings", DEFAULT_BANKROLL) if clone_current else DEFAULT_BANKROLL
+            create_bankroll_profile(new_profile_name or "Profil perso", settings=template_settings, activate=False)
+            st.success("Nouveau profil cree.")
+            st.experimental_rerun()
+
         strategy_labels = _strategy_display_map()
         strategy_codes = list(strategy_labels.keys())
         strategy_values = [strategy_labels[code] for code in strategy_codes]
@@ -69,7 +135,13 @@ def show_profile() -> None:
             current_index = strategy_codes.index(current_code)
         except ValueError:
             current_index = 0
-        with st.form("bankroll_form"):
+        form_key = f"bankroll_form_{selected_profile_id}"
+        with st.form(form_key):
+            profile_name_input = st.text_input(
+                "Nom du profil",
+                value=editing_profile["name"],
+                key=f"profile_name_input_{selected_profile_id}",
+            )
             amount = st.number_input(
                 "Capital disponible (EUR)",
                 min_value=0.0,
@@ -129,6 +201,8 @@ def show_profile() -> None:
 
             submitted_bankroll = st.form_submit_button("Enregistrer la bankroll")
             if submitted_bankroll:
+                if profile_name_input.strip() and profile_name_input.strip() != editing_profile["name"]:
+                    rename_bankroll_profile(selected_profile_id, profile_name_input.strip())
                 save_bankroll_settings(
                     {
                         "amount": amount,
@@ -139,9 +213,92 @@ def show_profile() -> None:
                         "default_odds": default_odds,
                         "min_stake": min_stake,
                         "max_stake": max_stake,
-                    }
+                        "profile_id": selected_profile_id,
+                        "profile_name": profile_name_input.strip() or editing_profile["name"],
+                    },
+                    profile_id=selected_profile_id,
                 )
                 st.success("Parametres de bankroll enregistres.")
+                st.experimental_rerun()
+
+    alert_settings = get_alert_settings()
+    with st.expander("Alertes & notifications", expanded=False):
+        with st.form("alert_settings_form"):
+            edge_threshold = st.slider(
+                "Seuil d'alerte Edge (%)",
+                min_value=1.0,
+                max_value=20.0,
+                value=float(alert_settings.get("edge_threshold_pct", 7.5)),
+                step=0.5,
+                help="Notification envoyee si l'edge principal depasse ce seuil.",
+            )
+            edge_dedup = st.number_input(
+                "Anti-spam (minutes) pour les edges",
+                min_value=5,
+                max_value=180,
+                value=int(alert_settings.get("edge_dedup_minutes", 45)),
+                step=5,
+            )
+            cashout_alert = st.checkbox(
+                "Alerter les cashouts critiques",
+                value=bool(alert_settings.get("cashout_alert_enabled", True)),
+            )
+            cashout_dedup = st.number_input(
+                "Anti-spam (minutes) pour les cashouts",
+                min_value=5,
+                max_value=120,
+                value=int(alert_settings.get("cashout_dedup_minutes", 20)),
+                step=5,
+            )
+            context_alert = st.checkbox(
+                "Alerter blessures / cartons rouges detectes",
+                value=bool(alert_settings.get("context_alert_enabled", True)),
+            )
+            st.markdown("Canaux de diffusion activés")
+            chan_row_1 = st.columns(3)
+            channel_slack = chan_row_1[0].checkbox(
+                "Slack",
+                value=bool(alert_settings.get("channel_slack", True)),
+            )
+            channel_discord = chan_row_1[1].checkbox(
+                "Discord",
+                value=bool(alert_settings.get("channel_discord", True)),
+            )
+            channel_email = chan_row_1[2].checkbox(
+                "Email",
+                value=bool(alert_settings.get("channel_email", False)),
+            )
+            chan_row_2 = st.columns(3)
+            channel_webhook = chan_row_2[0].checkbox(
+                "Webhook",
+                value=bool(alert_settings.get("channel_webhook", False)),
+            )
+            channel_telegram = chan_row_2[1].checkbox(
+                "Telegram",
+                value=bool(alert_settings.get("channel_telegram", False)),
+            )
+            channel_x = chan_row_2[2].checkbox(
+                "X (Twitter)",
+                value=bool(alert_settings.get("channel_x", False)),
+            )
+            submitted_alerts = st.form_submit_button("Enregistrer les alertes")
+            if submitted_alerts:
+                save_alert_settings(
+                    {
+                        "edge_threshold_pct": edge_threshold,
+                        "edge_dedup_minutes": int(edge_dedup),
+                        "cashout_alert_enabled": cashout_alert,
+                        "context_alert_enabled": context_alert,
+                        "cashout_dedup_minutes": int(cashout_dedup),
+                        "channel_slack": channel_slack,
+                        "channel_discord": channel_discord,
+                        "channel_email": channel_email,
+                        "channel_webhook": channel_webhook,
+                        "channel_telegram": channel_telegram,
+                        "channel_x": channel_x,
+                    }
+                )
+                st.success("Parametres d'alerte enregistres.")
                 st.experimental_rerun()
     st.subheader("Ponderation intensite match")
     with st.expander("Ajuster les composantes", expanded=False):
@@ -178,6 +335,38 @@ def show_profile() -> None:
                     }
                 )
                 st.success("Ponderations enregistrees.")
+                st.experimental_rerun()
+
+    st.subheader("Profils IA")
+    with st.expander("Parametrer les assistants IA", expanded=False):
+        ai_prefs = get_ai_preferences()
+        with st.form("ai_preferences_form"):
+            commentator_enabled = st.checkbox(
+                "Activer le commentateur TV IA",
+                value=bool(ai_prefs.get("commentator_enabled", DEFAULT_AI_PREFERENCES["commentator_enabled"])),
+                help="Affiche le widget de commentaire live dans la page Predictions.",
+            )
+            analysis_instruction = st.text_area(
+                "Consigne supplementaire pour l'analyse (optionnel)",
+                value=ai_prefs.get("analysis_instruction", ""),
+                placeholder="Ex: insiste sur les matchs nuls et la gestion du risque.",
+                help="Cette consigne sera ajoutee a l'analyse IA principale.",
+            )
+            commentator_instruction = st.text_area(
+                "Consigne supplementaire pour le commentateur (optionnel)",
+                value=ai_prefs.get("commentator_instruction", ""),
+                placeholder="Ex: ton radio avec focus tactique.",
+                help="Ajoute un style personnel aux commentaires TV.",
+            )
+            if st.form_submit_button("Enregistrer les preferences IA"):
+                save_ai_preferences(
+                    {
+                        "commentator_enabled": commentator_enabled,
+                        "analysis_instruction": analysis_instruction,
+                        "commentator_instruction": commentator_instruction,
+                    }
+                )
+                st.success("Preferences IA enregistrees.")
                 st.experimental_rerun()
 
     st.subheader("Bookmakers personnalises")
@@ -379,6 +568,27 @@ def show_profile() -> None:
             )
         )
 
+    st.markdown("---")
+    st.subheader("Retour utilisateur")
+    st.caption("Partage ton avis ou signale une anomalie ; le message est enregistré dans data/feedback.csv.")
+    with st.form("user_feedback_form"):
+        fb_cols = st.columns(2)
+        feedback_name = fb_cols[0].text_input("Nom / pseudo (optionnel)")
+        feedback_email = fb_cols[1].text_input("Email (optionnel)")
+        feedback_message = st.text_area("Message", placeholder="Ex: ce match n'a pas été mis à jour…", height=120)
+        if st.form_submit_button("Envoyer mon avis"):
+            if not feedback_message.strip():
+                st.error("Le message est obligatoire pour envoyer un retour.")
+            else:
+                append_feedback(feedback_name, feedback_email, feedback_message)
+                st.success("Merci pour ton retour, il a bien été enregistré.")
+
+    recent_feedback = load_feedback(limit=5)
+    if recent_feedback:
+        with st.expander("Derniers avis reçus", expanded=False):
+            for entry in recent_feedback[::-1]:
+                st.markdown(
+                    f"- *{entry.get('timestamp', '')}* — **{entry.get('name') or 'Anonyme'}** : {entry.get('message')}"
+                )
+
 __all__ = ["show_profile"]
-
-
