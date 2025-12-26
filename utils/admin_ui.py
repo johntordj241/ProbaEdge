@@ -10,6 +10,7 @@ import pandas as pd
 import streamlit as st
 from zoneinfo import ZoneInfo
 
+from .auth import list_users, set_user_plan
 from .cache import (
     auto_resume_remaining,
     cache_stats,
@@ -31,6 +32,7 @@ from .content_engine import (
     log_report_metadata,
     save_report_markdown,
 )
+from .subscription import DEFAULT_PLAN, PLAN_CODES, plan_label, normalize_plan
 from .supervision import endpoint_summary, health_snapshot, recent_calls, quota_status
 
 
@@ -507,8 +509,8 @@ def show_admin() -> None:
             icon="ℹ️",
         )
 
-    kpi_tab, maintenance_tab, data_tab, logs_tab = st.tabs(
-        ["KPI Predictions", "Maintenance", "Jeu de donnees", "Logs API"]
+    kpi_tab, maintenance_tab, data_tab, logs_tab, users_tab = st.tabs(
+        ["KPI Predictions", "Maintenance", "Jeu de donnees", "Logs API", "Utilisateurs"]
     )
 
     with kpi_tab:
@@ -578,3 +580,52 @@ def show_admin() -> None:
             st.dataframe(pd.DataFrame(calls), use_container_width=True, hide_index=True)
         else:
             st.info("Pas de logs disponibles.")
+
+    with users_tab:
+        st.subheader("Gestion des abonnements")
+        users = list_users()
+        if not users:
+            st.info("Aucun utilisateur enregistre.")
+        else:
+            overview_rows = [
+                {
+                    "Nom": user.get("name", "-"),
+                    "Email": user.get("email", "-"),
+                    "Plan": plan_label(user.get("plan")),
+                    "Cree le": user.get("created_at", "-").split("T")[0] if user.get("created_at") else "-",
+                }
+                for user in users
+            ]
+            st.dataframe(
+                pd.DataFrame(overview_rows),
+                use_container_width=True,
+                hide_index=True,
+            )
+            st.caption("Les changements de plan s'appliquent immediatement (Stripe Ã\xa0 venir).")
+
+            with st.form("plan_update_form"):
+                emails = [user.get("email") for user in users]
+                selections = {user.get("email"): f"{user.get('name','?')} ({plan_label(user.get('plan'))})" for user in users}
+                selected_email = st.selectbox(
+                    "Utilisateur",
+                    options=emails,
+                    format_func=lambda value: selections.get(value, value),
+                )
+                current_plan_code = normalize_plan(
+                    next((u.get("plan") for u in users if u.get("email") == selected_email), DEFAULT_PLAN)
+                )
+                selected_plan = st.selectbox(
+                    "Plan",
+                    PLAN_CODES,
+                    index=PLAN_CODES.index(current_plan_code),
+                    format_func=plan_label,
+                )
+                if st.form_submit_button("Mettre Ã\xa0 jour le plan"):
+                    if set_user_plan(selected_email, selected_plan):
+                        current = st.session_state.get("auth_user")
+                        if current and current.get("email") == selected_email:
+                            current["plan"] = normalize_plan(selected_plan)
+                        st.success("Plan mis Ã\xa0 jour.")
+                        st.experimental_rerun()
+                    else:
+                        st.error("Impossible de mettre Ã\xa0 jour ce compte.")

@@ -48,6 +48,14 @@ from utils.institutional import (
     show_security_data,
     show_legal_responsibility,
 )
+from utils.subscription import (
+    plan_allows,
+    menu_required_plan,
+    plan_label,
+    format_upgrade_hint,
+    normalize_plan,
+    COACH_MIN_PLAN,
+)
 
 st.set_page_config(page_title="Proba Edge", layout="wide")
 
@@ -57,6 +65,9 @@ DEFAULT_TEAM_ID = 85
 
 if not ensure_authenticated():
     st.stop()
+
+current_user = st.session_state.get("auth_user") or {}
+CURRENT_PLAN = normalize_plan(current_user.get("plan"))
 
 MENU_OPTIONS = [
     "Dashboard",
@@ -102,6 +113,12 @@ COACH_ALLOWED_PAGES = {
     "Supervision",
 }
 
+def _render_gate_message(menu_name: str, required_plan: str) -> None:
+    st.error(f"Cette section requiert l'offre {plan_label(required_plan)}.")
+    st.info(format_upgrade_hint(CURRENT_PLAN, required_plan))
+
+
+
 render_cache_controls(st.sidebar, key_prefix="main_")
 st.sidebar.markdown("---")
 render_supervision_status(st.sidebar)
@@ -121,70 +138,77 @@ if remaining > 0:
 else:
     st.success("Entrainement ML : nous sommes pret a relancer l'entrainement (100/100).")
 
-if menu == "Dashboard":
-    show_dashboard(DEFAULT_LEAGUE_ID, DEFAULT_SEASON, DEFAULT_TEAM_ID)
-elif menu == "Assistant IA":
-    show_chat_assistant()
-elif menu == "Agenda":
-    show_agenda()
-elif menu == "Roadmap":
-    show_roadmap()
-elif menu == "Rapports":
-    show_reports()
-elif menu == "Guides":
-    show_guides()
-elif menu == "Offres & abonnements":
-    show_offers()
-elif menu == "Audit interne":
-    show_private_report()
-elif menu == "Matchs":
-    show_matches(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
-elif menu == "Statistiques":
-    show_statistics(DEFAULT_LEAGUE_ID, DEFAULT_SEASON, DEFAULT_TEAM_ID)
-elif menu == "Classement":
-    show_standings(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
-elif menu == "Joueurs":
-    show_players(DEFAULT_LEAGUE_ID, DEFAULT_SEASON, DEFAULT_TEAM_ID)
-elif menu == "Predictions":
-    show_predictions(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
-elif menu == "Buteurs":
-    show_topscorers(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
-elif menu == "Passeurs":
-    show_topassists(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
-elif menu == "Cartons":
-    show_cards(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
-elif menu == "Cotes":
-    show_odds(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
-elif menu == "Bookmakers":
-    show_bookmaker_availability(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
-elif menu == "Profil":
-    show_profile()
-elif menu == "Historique":
-    update_history_view()
-elif menu == "Performance IA":
-    show_performance_dashboard()
-elif menu == "Tableau IA":
-    show_prediction_performance()
-elif menu == "Supervision":
-    show_supervision_dashboard()
-elif menu == "Stades":
-    show_venues()
-elif menu == "H2H":
-    show_h2h(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
-elif menu == "Tester l'API":
-    st.title("Tester l'API Football")
-    if st.button("Lancer les tests API"):
-        run_all_tests()
-elif menu == "Admin":
-    show_admin()
-elif menu == "Acces & gouvernance":
-    show_access_governance()
-elif menu == "Methodologie & limites":
-    show_methodology_limits()
-elif menu == "Securite & donnees":
-    show_security_data()
-elif menu == "Mentions legales":
-    show_legal_responsibility()
+required_plan = menu_required_plan(menu)
+access_granted = True
+if required_plan and not plan_allows(CURRENT_PLAN, required_plan):
+    _render_gate_message(menu, required_plan)
+    access_granted = False
 
-if menu in COACH_ALLOWED_PAGES:
+if access_granted:
+    if menu == "Dashboard":
+        show_dashboard(DEFAULT_LEAGUE_ID, DEFAULT_SEASON, DEFAULT_TEAM_ID)
+    elif menu == "Assistant IA":
+        show_chat_assistant()
+    elif menu == "Agenda":
+        show_agenda()
+    elif menu == "Roadmap":
+        show_roadmap()
+    elif menu == "Rapports":
+        show_reports()
+    elif menu == "Guides":
+        show_guides()
+    elif menu == "Offres & abonnements":
+        show_offers()
+    elif menu == "Audit interne":
+        show_private_report()
+    elif menu == "Matchs":
+        show_matches(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
+    elif menu == "Statistiques":
+        show_statistics(DEFAULT_LEAGUE_ID, DEFAULT_SEASON, DEFAULT_TEAM_ID)
+    elif menu == "Classement":
+        show_standings(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
+    elif menu == "Joueurs":
+        show_players(DEFAULT_LEAGUE_ID, DEFAULT_SEASON, DEFAULT_TEAM_ID)
+    elif menu == "Predictions":
+        show_predictions(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
+    elif menu == "Buteurs":
+        show_topscorers(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
+    elif menu == "Passeurs":
+        show_topassists(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
+    elif menu == "Cartons":
+        show_cards(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
+    elif menu == "Cotes":
+        show_odds(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
+    elif menu == "Bookmakers":
+        show_bookmaker_availability(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
+    elif menu == "Profil":
+        show_profile()
+    elif menu == "Historique":
+        update_history_view()
+    elif menu == "Performance IA":
+        show_performance_dashboard()
+    elif menu == "Tableau IA":
+        show_prediction_performance()
+    elif menu == "Supervision":
+        show_supervision_dashboard()
+    elif menu == "Stades":
+        show_venues()
+    elif menu == "H2H":
+        show_h2h(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
+    elif menu == "Tester l'API":
+        st.title("Tester l'API Football")
+        if st.button("Lancer les tests API"):
+            run_all_tests()
+    elif menu == "Admin":
+        show_admin()
+    elif menu == "Acces & gouvernance":
+        show_access_governance()
+    elif menu == "Methodologie & limites":
+        show_methodology_limits()
+    elif menu == "Securite & donnees":
+        show_security_data()
+    elif menu == "Mentions legales":
+        show_legal_responsibility()
+
+if menu in COACH_ALLOWED_PAGES and plan_allows(CURRENT_PLAN, COACH_MIN_PLAN):
     render_coach_widget()

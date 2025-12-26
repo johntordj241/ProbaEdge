@@ -5,6 +5,7 @@ from typing import Any
 import streamlit as st
 
 from .auth import authenticate_user, create_user
+from .subscription import plan_label, normalize_plan, UPGRADE_URL
 
 LANDING_PAGE_STYLES = """
 <style>
@@ -249,6 +250,9 @@ def render_account_sidebar(container: Any) -> None:
     container.markdown("### Mon compte")
     container.markdown(f"**{user.get('name', 'Utilisateur')}**")
     container.caption(user.get("email", ""))
+    plan_code = normalize_plan(user.get("plan"))
+    container.caption(f"Offre actuelle : {plan_label(plan_code)}")
+    container.write(f"[Gerer mon abonnement]({UPGRADE_URL})")
     if container.button("Se deconnecter", key="logout_button"):
         st.session_state.pop("auth_user", None)
         container.success("Deconnexion effectuee.")
