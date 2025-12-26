@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
-Diffuse automatiquement les templates (pré-match, live, alerte edge) vers Telegram/X/Email/Webhook
-en s'appuyant sur les dernières entrées `data/prediction_history.csv`.
+Diffuse automatiquement les templates (prÃ©-match, live, alerte edge) vers Telegram/X/Email/Webhook
+en s'appuyant sur les derniÃ¨res entrÃ©es `data/prediction_history.csv`.
 
 Usage basique :
     py -3.11 scripts/auto_broadcast.py --mode pre-match --channels telegram
@@ -109,12 +109,12 @@ def _status_label(row: Dict[str, Any], kickoff: Optional[datetime]) -> str:
     status = (row.get("status_snapshot") or "").upper()
     if status in PREMATCH_STATUS_CODES:
         if kickoff:
-            return f"Coup d'envoi prévu le {kickoff.strftime('%d/%m %H:%M')}"
-        return "Match à venir"
+            return f"Coup d'envoi prÃ©vu le {kickoff.strftime('%d/%m %H:%M')}"
+        return "Match Ã  venir"
     if status in LIVE_STATUS_CODES:
         return f"Live ({status})"
     if status in FINISHED_STATUS_CODES:
-        return f"Terminé ({status})"
+        return f"TerminÃ© ({status})"
     return status or "Statut inconnu"
 
 
@@ -276,22 +276,22 @@ def _send_message(channels: Sequence[str], subject: str, body: str) -> Dict[str,
             if service.has_telegram():
                 results[channel] = service.post_telegram(payload_text)
             else:
-                results[channel] = (False, "Telegram non configuré")
+                results[channel] = (False, "Telegram non configurÃ©")
         elif channel == "email":
             if service.has_email():
                 results[channel] = service.send_email(subject, body)
             else:
-                results[channel] = (False, "Email non configuré")
+                results[channel] = (False, "Email non configurÃ©")
         elif channel == "webhook":
             if service.has_webhook():
                 results[channel] = service.post_webhook(payload_text)
             else:
-                results[channel] = (False, "Webhook non configuré")
+                results[channel] = (False, "Webhook non configurÃ©")
         elif channel == "x":
             if service.has_x():
                 results[channel] = service.post_x(payload_text)
             else:
-                results[channel] = (False, "X non configuré")
+                results[channel] = (False, "X non configurÃ©")
         else:
             results[channel] = (False, "Canal inconnu")
     return results
@@ -320,7 +320,7 @@ def run_mode(
         allowed_fixture_ids=allowed_fixture_ids,
     )
     if not selected:
-        print(f"Aucune entrée à diffuser pour le mode '{mode}'.")
+        print(f"Aucune entrÃ©e Ã  diffuser pour le mode '{mode}'.")
         return
     log_entries = _load_log()
     cooldown = timedelta(hours=cooldown_hours)
@@ -333,7 +333,7 @@ def run_mode(
         try:
             rendered = render_template(template_key, context)
         except TemplateError as exc:
-            print(f"[{mode}] Impossible de générer le template pour fixture {fixture_id}: {exc}")
+            print(f"[{mode}] Impossible de gÃ©nÃ©rer le template pour fixture {fixture_id}: {exc}")
             continue
         subject = rendered.get("subject", "ProbaEdge")
         body = rendered.get("body", "")
@@ -350,9 +350,9 @@ def run_mode(
                 _record_entry(fixture_id, template_key)
                 sent += 1
     if dry_run:
-        print(f"[{mode}] Aperçu terminé ({len(selected)} messages potentiels).")
+        print(f"[{mode}] AperÃ§u terminÃ© ({len(selected)} messages potentiels).")
     else:
-        print(f"[{mode}] Diffusion terminée ({sent} messages envoyés).")
+        print(f"[{mode}] Diffusion terminÃ©e ({sent} messages envoyÃ©s).")
 
 
 def parse_args() -> argparse.Namespace:
@@ -361,7 +361,7 @@ def parse_args() -> argparse.Namespace:
         "--mode",
         choices=["pre-match", "live", "edge", "all"],
         default="pre-match",
-        help="Type de message à diffuser.",
+        help="Type de message Ã  diffuser.",
     )
     parser.add_argument(
         "--limit",
@@ -373,7 +373,7 @@ def parse_args() -> argparse.Namespace:
         "--horizon-minutes",
         type=int,
         default=360,
-        help="Fenêtre temporelle max (pré-match seulement).",
+        help="FenÃªtre temporelle max (prÃ©-match seulement).",
     )
     parser.add_argument(
         "--min-edge",
@@ -383,14 +383,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--channels",
-        default="telegram",
-        help="Liste de canaux séparés par des virgules (telegram,email,webhook,x).",
+        default="telegram,email",
+        help="Liste de canaux sÃ©parÃ©s par des virgules (telegram,email,webhook,x).",
     )
     parser.add_argument(
         "--cooldown-hours",
         type=float,
         default=2.0,
-        help="Délai minimum avant de renvoyer le même template sur un match.",
+        help="DÃ©lai minimum avant de renvoyer le mÃªme template sur un match.",
     )
     parser.add_argument(
         "--dry-run",
@@ -407,7 +407,7 @@ def parse_args() -> argparse.Namespace:
         "--agenda-timezone",
         type=str,
         default="Europe/Paris",
-        help="Fuseau horaire utilisé pour l'agenda (si --agenda-date est défini).",
+        help="Fuseau horaire utilisÃ© pour l'agenda (si --agenda-date est dÃ©fini).",
     )
     return parser.parse_args()
 
@@ -439,7 +439,7 @@ def main() -> None:
         try:
             agenda_fixture_ids = _agenda_fixture_ids(agenda_date, args.agenda_timezone)
             if not agenda_fixture_ids:
-                print(f"[agenda] Aucun match trouvé pour {agenda_date}.")
+                print(f"[agenda] Aucun match trouvÃ© pour {agenda_date}.")
         except Exception as exc:
             print(f"[agenda] Impossible de charger les matchs ({agenda_date}) : {exc}")
             agenda_fixture_ids = set()

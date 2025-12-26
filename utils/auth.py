@@ -8,6 +8,7 @@ from typing import Dict, Optional, Tuple
 
 import hashlib
 
+from .subscription import DEFAULT_PLAN, normalize_plan
 
 USERS_PATH = Path("data/users.json")
 
@@ -54,9 +55,18 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _normalize_user_entry(entry: Dict[str, str]) -> Dict[str, str]:
+    normalized = dict(entry)
+    normalized["plan"] = normalize_plan(normalized.get("plan"))
+    return normalized
+
+
 def list_users() -> list[Dict[str, str]]:
     store = _load_store()
-    return list(store.get("users", []))
+    users = []
+    for entry in store.get("users", []):
+        users.append(_normalize_user_entry(entry))
+    return users
 
 
 def find_user(email: str) -> Optional[Dict[str, str]]:
@@ -83,10 +93,11 @@ def create_user(email: str, password: str, full_name: str) -> Dict[str, str]:
         "salt": salt,
         "name": full_name.strip() or email_norm.split("@")[0],
         "created_at": _now_iso(),
+        "plan": DEFAULT_PLAN,
     }
     store.setdefault("users", []).append(entry)
     _save_store(store)
-    return entry
+    return _normalize_user_entry(entry)
 
 
 def authenticate_user(email: str, password: str) -> Optional[Dict[str, str]]:
@@ -97,7 +108,7 @@ def authenticate_user(email: str, password: str) -> Optional[Dict[str, str]]:
     _, hashed = _hash_password(password, salt=salt)
     if hashed != user.get("password"):
         return None
-    return user
+    return _normalize_user_entry(user)
 
 
 def change_password(email: str, old_password: str, new_password: str) -> bool:
@@ -121,10 +132,28 @@ def change_password(email: str, old_password: str, new_password: str) -> bool:
     return False
 
 
+def set_user_plan(email: str, new_plan: str) -> bool:
+    plan_code = normalize_plan(new_plan)
+    store = _load_store()
+    email_norm = _normalize_email(email)
+    updated = False
+    for user in store.get("users", []):
+        if user.get("email") != email_norm:
+            continue
+        user["plan"] = plan_code
+        user["plan_updated_at"] = _now_iso()
+        updated = True
+        break
+    if updated:
+        _save_store(store)
+    return updated
+
+
 __all__ = [
     "create_user",
     "authenticate_user",
     "find_user",
     "list_users",
     "change_password",
+    "set_user_plan",
 ]

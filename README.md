@@ -87,8 +87,9 @@ pytest
 | `python scripts/export_supervision_metrics.py` | Exporte les metriques de supervision |
 | `python scripts/publish_roadmap.py` | Regenere `docs/roadmap.md` a partir de `data/roadmap.yaml` |
 | `python scripts/social_engine.py --publish` | GÃ©nÃ¨re le rÃ©sumÃ© Social Engine et le publie (Slack/Discord + Supabase) |
-| `py -3.11 scripts/auto_broadcast.py --mode pre-match --channels telegram` | Diffuse automatiquement les templates (pré-match / live / edge) vers les canaux configurés |
-| `py -3.11 scripts/auto_broadcast.py --mode pre-match --channels telegram --agenda-date today` | Même diffusion mais limitée aux matchs présents dans l'Agenda du jour |
+| `py -3.11 scripts/auto_broadcast.py --mode pre-match --channels telegram,email` | Diffuse automatiquement les templates (pré-match / live / edge) vers les canaux configurés |
+| `py -3.11 scripts/auto_broadcast.py --mode pre-match --channels telegram,email --agenda-date today` | Même diffusion mais limitée aux matchs présents dans l'Agenda du jour |
+| `py -3.11 scripts/sync_active_squad.py --team 33 --season 2024` | Synchronise l'effectif actif (injuries / transferts / lineups) dans la table `players` |
 
 ## Structure des donnees
 
