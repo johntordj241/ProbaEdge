@@ -8,9 +8,13 @@ from typing import Dict, Optional, Tuple
 
 import hashlib
 
-from .subscription import DEFAULT_PLAN, normalize_plan
+from .secrets import get_secret
+from .subscription import DEFAULT_PLAN, normalize_plan, BETA_PLAN_CODE
 
 USERS_PATH = Path("data/users.json")
+BETA_CODES_ENV = "BETA_ACCESS_CODES"
+BETA_EMAILS_ENV = "BETA_TESTER_EMAILS"
+BETA_DOMAINS_ENV = "BETA_TESTER_DOMAINS"
 
 
 def _ensure_store() -> None:
@@ -61,6 +65,36 @@ def _normalize_user_entry(entry: Dict[str, str]) -> Dict[str, str]:
     return normalized
 
 
+def _env_list(name: str) -> set[str]:
+    raw = get_secret(name) or ""
+    return {item.strip().lower() for item in raw.split(",") if item.strip()}
+
+
+def _is_beta_email(email: str) -> bool:
+    email_norm = _normalize_email(email)
+    if not email_norm or "@" not in email_norm:
+        return False
+    if email_norm in _env_list(BETA_EMAILS_ENV):
+        return True
+    domain = email_norm.split("@", 1)[1]
+    return domain in _env_list(BETA_DOMAINS_ENV)
+
+
+def _has_beta_code(access_code: Optional[str]) -> bool:
+    if not access_code:
+        return False
+    candidate = access_code.strip().lower()
+    if not candidate:
+        return False
+    return candidate in _env_list(BETA_CODES_ENV)
+
+
+def _initial_plan(email: str, access_code: Optional[str]) -> str:
+    if _has_beta_code(access_code) or _is_beta_email(email):
+        return BETA_PLAN_CODE
+    return DEFAULT_PLAN
+
+
 def list_users() -> list[Dict[str, str]]:
     store = _load_store()
     users = []
@@ -77,7 +111,12 @@ def find_user(email: str) -> Optional[Dict[str, str]]:
     return None
 
 
-def create_user(email: str, password: str, full_name: str) -> Dict[str, str]:
+def create_user(
+    email: str,
+    password: str,
+    full_name: str,
+    access_code: Optional[str] = None,
+) -> Dict[str, str]:
     email_norm = _normalize_email(email)
     if not email_norm or "@" not in email_norm:
         raise ValueError("Adresse email invalide.")
@@ -93,7 +132,7 @@ def create_user(email: str, password: str, full_name: str) -> Dict[str, str]:
         "salt": salt,
         "name": full_name.strip() or email_norm.split("@")[0],
         "created_at": _now_iso(),
-        "plan": DEFAULT_PLAN,
+        "plan": _initial_plan(email_norm, access_code),
     }
     store.setdefault("users", []).append(entry)
     _save_store(store)

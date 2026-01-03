@@ -56,6 +56,16 @@ SLACK_WEBHOOK_URL=...
 
 Les modules sensibles (`utils/config.py`, `utils/widgets.py`, `utils/ai_.module.py`, `utils/weather.py`, `utils/supabase_client.py`) refusent dÃ©sormais de s'exÃ©cuter si la clÃ© correspondante est absente.  
 > Tip : dÃ©finissez `FOOTBALL_APP_ENV_FILE=/chemin/vers/mon.env` pour charger un fichier .env alternatif (Vault / CI).
+#### Activer l'offre Beta testeur
+
+Partagez la version **Elite** sans modifier `data/users.json` :
+
+- `BETA_ACCESS_CODES` : liste de codes (CSV) a communiquer aux testeurs. Ils le saisissent dans le champ *Code beta testeur* du formulaire d'inscription, et leur compte bascule directement sur le plan `beta`.
+- `BETA_TESTER_EMAILS` : adresses precises a whitelister automatiquement.
+- `BETA_TESTER_DOMAINS` : domaines (ex. `club.com,partner.org`) qui debloquent automatiquement le plan `beta` a l'inscription.
+
+Le plan `beta` offre les memes capacites que **Elite** (quotas API, IA, diffusion), mais reste identifie comme tel et n'autorise pas l'onglet **Admin**.
+
 
 **Activer Telegram (optionnel, diffusion controlee)**
 1. Dans Telegram, ouvrez **@BotFather**, lancez `/start` puis `/newbot` pour obtenir `TELEGRAM_BOT_TOKEN`.

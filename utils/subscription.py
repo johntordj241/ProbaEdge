@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 
+BETA_PLAN_CODE = "beta"
+
 PLAN_LEVELS: Dict[str, int] = {
     "lite": 0,
     "starter": 1,
     "pro": 2,
     "elite": 3,
+    BETA_PLAN_CODE: 3,
 }
 
 PLAN_LABELS: Dict[str, str] = {
@@ -14,6 +17,7 @@ PLAN_LABELS: Dict[str, str] = {
     "starter": "Starter",
     "pro": "Proba Edge Pro",
     "elite": "Elite",
+    BETA_PLAN_CODE: "Beta testeur",
 }
 
 DEFAULT_PLAN = "lite"
@@ -70,6 +74,7 @@ def format_upgrade_hint(current_plan: Optional[str], required_plan: Optional[str
 
 
 __all__ = [
+    "BETA_PLAN_CODE",
     "PLAN_CODES",
     "PLAN_LEVELS",
     "PLAN_LABELS",

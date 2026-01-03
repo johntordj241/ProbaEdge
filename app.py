@@ -57,7 +57,11 @@ from utils.subscription import (
     COACH_MIN_PLAN,
 )
 
-st.set_page_config(page_title="Proba Edge", layout="wide")
+st.set_page_config(
+    page_title="Proba Edge",
+    layout="wide",
+    page_icon="assets/logo_proba_edge.png",
+)
 
 DEFAULT_LEAGUE_ID = 61
 DEFAULT_SEASON = 2025
@@ -143,6 +147,9 @@ access_granted = True
 if required_plan and not plan_allows(CURRENT_PLAN, required_plan):
     _render_gate_message(menu, required_plan)
     access_granted = False
+if access_granted and menu == "Admin" and CURRENT_PLAN != "elite":
+    _render_gate_message(menu, "elite")
+    access_granted = False
 
 if access_granted:
     if menu == "Dashboard":
@@ -212,3 +219,5 @@ if access_granted:
 
 if menu in COACH_ALLOWED_PAGES and plan_allows(CURRENT_PLAN, COACH_MIN_PLAN):
     render_coach_widget()
+
+st.caption("Développé par **Tordjeman Labs** avec beaucoup d'amour ❤️")

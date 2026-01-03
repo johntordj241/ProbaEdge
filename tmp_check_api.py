@@ -1,1 +1,0 @@
-import os,requests,Pathlib\nfrom pathlib import Path\nurl= https://v3.football.api-sports.io/fixtures\nparams={league:39,season:2025,next:5}\nheaders={x-apisports-key:os.getenv(API_FOOTBALL_KEY) or }\nresp=requests.get(url,params=params,headers=headers,timeout=20)\nPath(tmp_output.txt).write_text(str(resp.status_code)+\n+resp.text[:500],encoding=utf-8)

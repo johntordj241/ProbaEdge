@@ -131,13 +131,18 @@ def _register_form(show_heading: bool = True) -> bool:
             key="register_confirm",
             placeholder="Repetez le mot de passe",
         )
+        beta_code = st.text_input(
+            "Code beta testeur (optionnel)",
+            key="register_beta_code",
+            placeholder="Code transmis par l'equipe",
+        )
         submitted = st.form_submit_button("Demander un acces", use_container_width=True)
     if submitted:
         if password != confirm:
             st.error("Les mots de passe ne correspondent pas.")
             return False
         try:
-            user = create_user(email, password, name)
+            user = create_user(email, password, name, access_code=beta_code or None)
         except ValueError as exc:
             st.error(str(exc))
             return False
