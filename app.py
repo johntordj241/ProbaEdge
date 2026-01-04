@@ -66,6 +66,7 @@ st.set_page_config(
 DEFAULT_LEAGUE_ID = 61
 DEFAULT_SEASON = 2025
 DEFAULT_TEAM_ID = 85
+LOGO_PATH = ROOT_DIR / "assets" / "logo_proba_edge.svg"
 
 if not ensure_authenticated():
     st.stop()
@@ -122,6 +123,10 @@ def _render_gate_message(menu_name: str, required_plan: str) -> None:
     st.info(format_upgrade_hint(CURRENT_PLAN, required_plan))
 
 
+
+if LOGO_PATH.exists():
+    st.sidebar.image(str(LOGO_PATH), width=180)
+    st.sidebar.markdown("---")
 
 render_cache_controls(st.sidebar, key_prefix="main_")
 st.sidebar.markdown("---")

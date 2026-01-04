@@ -13,6 +13,7 @@ from .prediction_history import load_prediction_history
 from .supabase_client import enqueue_social_post, store_report_metadata
 from .supervision import health_snapshot
 from .match_filter import get_matches_over_horizon
+from .prediction_metrics import ensure_success_flag
 
 REPORTS_DIR = Path("docs/reports")
 TEMPLATES_DIR = Path("supabase/templates")
@@ -68,6 +69,7 @@ def _load_prediction_df() -> pd.DataFrame:
     df["edge_pct"] = df.get("edge_comment")
     if "edge_pct" in df:
         df["edge_pct"] = pd.to_numeric(df["edge_pct"], errors="coerce")
+    df = ensure_success_flag(df)
     return df
 
 

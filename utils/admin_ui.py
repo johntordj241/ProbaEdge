@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
-import unicodedata
 
 import numpy as np
 import pandas as pd
@@ -34,6 +33,7 @@ from .content_engine import (
 )
 from .subscription import DEFAULT_PLAN, PLAN_CODES, plan_label, normalize_plan
 from .supervision import endpoint_summary, health_snapshot, recent_calls, quota_status
+from .prediction_metrics import compute_success_flag
 
 
 def _format_timestamp(ts: Optional[float]) -> str:
@@ -138,72 +138,6 @@ def _render_offline_form() -> None:
         st.experimental_rerun()
 
 
-def _normalize_text(value: Any) -> str:
-    base = unicodedata.normalize("NFKD", str(value or ""))
-    ascii_text = "".join(ch for ch in base if ord(ch) < 128)
-    return " ".join(ascii_text.lower().split())
-
-
-def _has_excluded_keyword(text: str) -> bool:
-    if not text:
-        return False
-    keywords = {
-        "double chance",
-        "over",
-        "under",
-        "buts",
-        "handicap",
-        "btts",
-        "buteur",
-        "score exact",
-        "carton",
-        "corners",
-        "total",
-    }
-    return any(keyword in text for keyword in keywords)
-
-
-def _prediction_side(row: pd.Series) -> Optional[str]:
-    home = _normalize_text(row.get("home_team"))
-    away = _normalize_text(row.get("away_team"))
-    candidates = [
-        _normalize_text(row.get("main_pick")),
-        _normalize_text(row.get("bet_selection")),
-    ]
-    for text in candidates:
-        if not text:
-            continue
-        if _has_excluded_keyword(text):
-            continue
-        if home and home in text:
-            return "home"
-        if away and away in text:
-            return "away"
-        if "match nul" in text or "nul" in text or "draw" in text or text.strip() == "x":
-            return "draw"
-        if "victoire domicile" in text or "gagne domicile" in text:
-            return "home"
-        if "victoire exterieur" in text or "gagne exterieur" in text:
-            return "away"
-    return None
-
-
-def _compute_success_flag(row: pd.Series) -> Optional[bool]:
-    result = _normalize_text(row.get("result_winner"))
-    if not result:
-        return None
-    side = _prediction_side(row)
-    if not side:
-        return None
-    if any(token in result for token in {"home", "domicile", "1"}):
-        return side == "home"
-    if any(token in result for token in {"away", "exterieur", "2"}):
-        return side == "away"
-    if any(token in result for token in {"draw", "nul", "x"}):
-        return side == "draw"
-    return None
-
-
 def _load_prediction_dataframe() -> pd.DataFrame:
     try:
         df = load_prediction_history()
@@ -222,7 +156,7 @@ def _load_prediction_dataframe() -> pd.DataFrame:
     for column in ("bet_stake", "bet_odd", "bet_return", "main_confidence", "league_id", "season"):
         df[column] = pd.to_numeric(df.get(column), errors="coerce")
 
-    df["success_flag"] = df.apply(_compute_success_flag, axis=1)
+    df["success_flag"] = df.apply(compute_success_flag, axis=1)
     df["bet_return_computed"] = np.where(
         df["success_flag"] == True,
         df["bet_stake"] * df["bet_odd"],
