@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import base64
 import sys
 from pathlib import Path
 
@@ -125,7 +126,15 @@ def _render_gate_message(menu_name: str, required_plan: str) -> None:
 
 
 if LOGO_PATH.exists():
-    st.sidebar.image(str(LOGO_PATH), width=180)
+    if LOGO_PATH.suffix.lower() == ".svg":
+        svg_payload = base64.b64encode(LOGO_PATH.read_bytes()).decode("utf-8")
+        st.sidebar.markdown(
+            f"<img src='data:image/svg+xml;base64,{svg_payload}' "
+            "style='width: 180px; display: block; margin: 0 auto;'/>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.sidebar.image(str(LOGO_PATH), width=180)
     st.sidebar.markdown("---")
 
 render_cache_controls(st.sidebar, key_prefix="main_")

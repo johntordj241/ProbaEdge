@@ -66,6 +66,7 @@ def _load_prediction_df() -> pd.DataFrame:
         return df
     df = df.copy()
     df["timestamp"] = pd.to_datetime(df.get("timestamp"), errors="coerce", utc=True)
+    df["fixture_date"] = pd.to_datetime(df.get("fixture_date"), errors="coerce", utc=True)
     df["edge_pct"] = df.get("edge_comment")
     if "edge_pct" in df:
         df["edge_pct"] = pd.to_numeric(df["edge_pct"], errors="coerce")
@@ -153,9 +154,12 @@ def generate_content_payload() -> ContentPayload:
         )
     pending = df[result_series.isna()]
     if not pending.empty:
-        next_kickoff = pending.get("fixture_date").dropna().min()
-        if pd.notna(next_kickoff):
-            bullet_points.append(f"Prochain match en attente : {next_kickoff.strftime('%d/%m %H:%M')}.")
+        fixture_dates = pd.to_datetime(pending.get("fixture_date"), errors="coerce", utc=True)
+        fixture_dates = fixture_dates.dropna()
+        if not fixture_dates.empty:
+            next_kickoff = fixture_dates.min()
+            kickoff_label = next_kickoff.tz_convert("Europe/Paris").strftime("%d/%m %H:%M")
+            bullet_points.append(f"Prochain match en attente : {kickoff_label}.")
     match_gap_msg = _match_gap_bullet()
     if match_gap_msg:
         bullet_points.append(match_gap_msg)
