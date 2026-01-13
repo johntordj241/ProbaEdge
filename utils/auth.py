@@ -188,6 +188,27 @@ def set_user_plan(email: str, new_plan: str) -> bool:
     return updated
 
 
+def admin_set_password(email: str, new_password: str) -> bool:
+    """
+    Force la regeneration du mot de passe sans connaitre l'ancien.
+    Utilise pour les resets effectues depuis le panneau admin.
+    """
+    if len(new_password) < 6:
+        raise ValueError("Le nouveau mot de passe doit contenir au moins 6 caracteres.")
+    store = _load_store()
+    email_norm = _normalize_email(email)
+    for user in store.get("users", []):
+        if user.get("email") != email_norm:
+            continue
+        salt, hashed = _hash_password(new_password)
+        user["salt"] = salt
+        user["password"] = hashed
+        user["updated_at"] = _now_iso()
+        _save_store(store)
+        return True
+    return False
+
+
 __all__ = [
     "create_user",
     "authenticate_user",
@@ -195,4 +216,5 @@ __all__ = [
     "list_users",
     "change_password",
     "set_user_plan",
+    "admin_set_password",
 ]

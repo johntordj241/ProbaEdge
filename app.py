@@ -22,7 +22,7 @@ from utils.h2h import show_h2h
 from utils.match_filter import show_bookmaker_availability
 from utils.odds import show_odds
 from utils.players_ui import show_players
-from utils.prediction_history import training_progress
+from utils.prediction_history import training_progress, sync_prediction_results
 from utils.predictions import show_predictions
 from utils.roadmap import show_roadmap
 from utils.standings import show_standings
@@ -72,6 +72,25 @@ LOGO_PATH = ROOT_DIR / "assets" / "logo_proba_edge.svg"
 if not ensure_authenticated():
     st.stop()
 
+
+# Synchroniser automatiquement les résultats des matchs terminés
+@st.cache_resource
+def _init_sync():
+    """Synchro des résultats au démarrage de l'app (une seule fois)"""
+    try:
+        synced = sync_prediction_results(limit=50)
+        return synced
+    except Exception:
+        return 0
+
+
+try:
+    synced_count = _init_sync()
+    if synced_count > 0:
+        st.toast(f"✅ {synced_count} résultats de matchs mis à jour", icon="🔄")
+except Exception as e:
+    st.error(f"Erreur lors de la synchronisation des résultats: {e}", icon="⚠️")
+
 current_user = st.session_state.get("auth_user") or {}
 CURRENT_PLAN = normalize_plan(current_user.get("plan"))
 
@@ -119,10 +138,10 @@ COACH_ALLOWED_PAGES = {
     "Supervision",
 }
 
+
 def _render_gate_message(menu_name: str, required_plan: str) -> None:
     st.error(f"Cette section requiert l'offre {plan_label(required_plan)}.")
     st.info(format_upgrade_hint(CURRENT_PLAN, required_plan))
-
 
 
 if LOGO_PATH.exists():
@@ -152,9 +171,13 @@ ready = progress["ready"]
 target = progress["target"]
 remaining = progress["remaining"]
 if remaining > 0:
-    st.warning(f"Entrainement ML : {ready} / {target} matches finalises. Il en manque {remaining} pour lancer la mise a jour du modele.")
+    st.warning(
+        f"Entrainement ML : {ready} / {target} matches finalises. Il en manque {remaining} pour lancer la mise a jour du modele."
+    )
 else:
-    st.success("Entrainement ML : nous sommes pret a relancer l'entrainement (100/100).")
+    st.success(
+        "Entrainement ML : nous sommes pret a relancer l'entrainement (100/100)."
+    )
 
 required_plan = menu_required_plan(menu)
 access_granted = True

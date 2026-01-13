@@ -33,6 +33,7 @@ CACHE_TTL: Dict[str, int] = {
     "standings": 600,
     "teams/statistics": 600,
     "players": 600,
+    "players/squads": 3600,
     "players/topscorers": 300,
     "players/topassists": 300,
     "players/topyellowcards": 300,
@@ -45,7 +46,6 @@ CACHE_TTL: Dict[str, int] = {
     "leagues": 7200,
     "teams": 7200,
 }
-
 
 
 def _sleep_backoff(attempt: int) -> None:
@@ -127,7 +127,11 @@ def _request(path: str, params: Dict[str, Any], *, force_refresh: bool = False) 
                 if ttl:
                     save_cache(path, cleaned_params, response_payload, ttl)
                 try:
-                    remaining_int = int(quota_remaining) if quota_remaining not in {None, ""} else None
+                    remaining_int = (
+                        int(quota_remaining)
+                        if quota_remaining not in {None, ""}
+                        else None
+                    )
                 except (TypeError, ValueError):
                     remaining_int = None
                 if remaining_int is not None and remaining_int <= 0:
@@ -148,7 +152,9 @@ def _request(path: str, params: Dict[str, Any], *, force_refresh: bool = False) 
                 return response_payload
 
             last_status = resp.status_code
-            should_retry = resp.status_code in RETRYABLE_STATUS and attempts < MAX_RETRIES
+            should_retry = (
+                resp.status_code in RETRYABLE_STATUS and attempts < MAX_RETRIES
+            )
             if resp.status_code in {402, 403, 429} and not should_retry:
                 set_offline_mode(True, reason="quota", resume_in=600)
             last_error = resp.text[:200]
@@ -217,7 +223,6 @@ def _request(path: str, params: Dict[str, Any], *, force_refresh: bool = False) 
             return None
 
 
-
 def get_fixtures(
     league_id: int,
     season: int,
@@ -256,7 +261,6 @@ def get_fixtures_by_date(
     return _request("fixtures", params)
 
 
-
 def get_fixture_details(fixture_id: int) -> Json:
     return _request("fixtures", {"id": fixture_id})
 
@@ -288,21 +292,17 @@ def get_leagues(
     return _request("leagues", params)
 
 
-
 def get_standings(league_id: int, season: int) -> Json:
     return _request("standings", {"league": league_id, "season": season})
-
 
 
 def get_teams(league_id: int, season: int) -> Json:
     return _request("teams", {"league": league_id, "season": season})
 
 
-
 def get_players(league_id: int, season: int, team_id: int, page: int = 1) -> Json:
     params = {"league": league_id, "season": season, "team": team_id, "page": page}
     return _request("players", params)
-
 
 
 def get_players_for_team(
@@ -348,32 +348,36 @@ def get_statistics(league_id: int, season: int, team_id: int) -> Json:
     return _request("teams/statistics", params)
 
 
-
 def get_topscorers(league_id: int, season: int) -> Json:
     return _request("players/topscorers", {"league": league_id, "season": season})
-
 
 
 def get_topassists(league_id: int, season: int) -> Json:
     return _request("players/topassists", {"league": league_id, "season": season})
 
 
-
 def get_cards(league_id: int, season: int) -> Json:
-    yellow = _request("players/topyellowcards", {"league": league_id, "season": season}) or []
+    yellow = (
+        _request("players/topyellowcards", {"league": league_id, "season": season})
+        or []
+    )
     red = _request("players/topredcards", {"league": league_id, "season": season}) or []
     if isinstance(yellow, list) and isinstance(red, list):
         return yellow + red
     return yellow or red
 
 
-
-def get_odds(league_id: int, season: int, date: Optional[str] = None, *, force_refresh: bool = False) -> Json:
+def get_odds(
+    league_id: int,
+    season: int,
+    date: Optional[str] = None,
+    *,
+    force_refresh: bool = False,
+) -> Json:
     params = {"league": league_id, "season": season}
     if date:
         params["date"] = date
     return _request("odds", params, force_refresh=force_refresh)
-
 
 
 def get_odds_by_fixture(fixture_id: int, *, force_refresh: bool = False) -> Json:
@@ -382,7 +386,6 @@ def get_odds_by_fixture(fixture_id: int, *, force_refresh: bool = False) -> Json
 
 def get_odds_bookmakers(force_refresh: bool = False) -> Json:
     return _request("odds/bookmakers", {}, force_refresh=force_refresh)
-
 
 
 def get_venues(country: Optional[str] = None, team_id: Optional[int] = None) -> Json:
@@ -394,7 +397,6 @@ def get_venues(country: Optional[str] = None, team_id: Optional[int] = None) -> 
     return _request("venues", params)
 
 
-
 def get_injuries(league_id: int, season: int, team_id: Optional[int] = None) -> Json:
     params: Dict[str, Any] = {"league": league_id, "season": season}
     if team_id:
@@ -402,10 +404,8 @@ def get_injuries(league_id: int, season: int, team_id: Optional[int] = None) -> 
     return _request("injuries", params)
 
 
-
 def get_predictions(fixture_id: int) -> Json:
     return _request("predictions", {"fixture": fixture_id})
-
 
 
 def get_h2h(team1_id: int, team2_id: int, last: int = 10) -> Json:
@@ -460,7 +460,10 @@ def _build_lineup_player_entry(
             "position": player_block.get("pos"),
             "number": player_block.get("number"),
         },
-        "goals": {"total": player_block.get("goals") or 0, "assists": player_block.get("assists")},
+        "goals": {
+            "total": player_block.get("goals") or 0,
+            "assists": player_block.get("assists"),
+        },
         "shots": {"total": None, "on": None},
         "passes": {"total": None, "key": None, "accuracy": None},
         "tackles": {"total": None},
@@ -497,7 +500,9 @@ def _lineup_roster_for_team(
         return roster
     fixtures = get_fixtures(league_id, season, team_id=team_id, last_n=lookback) or []
     if not fixtures:
-        fixtures = get_fixtures(league_id, season, team_id=team_id, next_n=lookback) or []
+        fixtures = (
+            get_fixtures(league_id, season, team_id=team_id, next_n=lookback) or []
+        )
     seen: set[str] = set()
     for fixture in fixtures:
         fixture_block = fixture.get("fixture") or {}

@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 from zoneinfo import ZoneInfo
 
-from .auth import list_users, set_user_plan
+from .auth import create_user, list_users, set_user_plan, admin_set_password
 from .cache import (
     auto_resume_remaining,
     cache_stats,
@@ -535,7 +535,7 @@ def show_admin() -> None:
                 use_container_width=True,
                 hide_index=True,
             )
-            st.caption("Les changements de plan s'appliquent immediatement (Stripe Ã\xa0 venir).")
+            st.caption("Les changements de plan s'appliquent immediatement (Stripe a venir).")
 
             with st.form("plan_update_form"):
                 emails = [user.get("email") for user in users]
@@ -554,12 +554,67 @@ def show_admin() -> None:
                     index=PLAN_CODES.index(current_plan_code),
                     format_func=plan_label,
                 )
-                if st.form_submit_button("Mettre Ã\xa0 jour le plan"):
+                if st.form_submit_button("Mettre a jour le plan"):
                     if set_user_plan(selected_email, selected_plan):
                         current = st.session_state.get("auth_user")
                         if current and current.get("email") == selected_email:
                             current["plan"] = normalize_plan(selected_plan)
-                        st.success("Plan mis Ã\xa0 jour.")
+                        st.success("Plan mis a jour.")
                         st.experimental_rerun()
                     else:
-                        st.error("Impossible de mettre Ã\xa0 jour ce compte.")
+                        st.error("Impossible de mettre a jour ce compte.")
+
+            st.markdown("---")
+            st.subheader("Creer un compte test")
+            with st.form("admin_create_user_form"):
+                new_name = st.text_input("Nom complet", key="admin_new_name")
+                new_email = st.text_input("Email", key="admin_new_email")
+                new_password = st.text_input("Mot de passe initial", type="password", key="admin_new_password")
+                plan_choice = st.selectbox(
+                    "Plan attribue",
+                    PLAN_CODES,
+                    index=PLAN_CODES.index("beta") if "beta" in PLAN_CODES else 0,
+                    format_func=plan_label,
+                    key="admin_new_plan",
+                )
+                submit_create = st.form_submit_button("Creer le compte")
+                if submit_create:
+                    if len(new_password) < 6:
+                        st.error("Le mot de passe doit contenir au moins 6 caracteres.")
+                    else:
+                        try:
+                            created = create_user(new_email, new_password, new_name or new_email.split("@")[0])
+                        except ValueError as exc:
+                            st.error(str(exc))
+                        else:
+                            target_plan = normalize_plan(plan_choice)
+                            if target_plan != created.get("plan"):
+                                set_user_plan(created["email"], target_plan)
+                            st.success(f"Compte cree pour {created['email']} ({plan_label(target_plan)}).")
+                            st.experimental_rerun()
+
+            st.markdown("---")
+            st.subheader("Reinitialiser un mot de passe")
+            with st.form("admin_reset_password_form"):
+                reset_email = st.selectbox(
+                    "Utilisateur",
+                    options=emails,
+                    format_func=lambda value: selections.get(value, value),
+                )
+                new_pwd = st.text_input("Nouveau mot de passe", type="password", key="admin_reset_pwd")
+                confirm_pwd = st.text_input("Confirmer le mot de passe", type="password", key="admin_reset_confirm")
+                submit_reset = st.form_submit_button("Reinitialiser le mot de passe")
+                if submit_reset:
+                    if new_pwd != confirm_pwd:
+                        st.error("Les mots de passe ne correspondent pas.")
+                    else:
+                        try:
+                            updated = admin_set_password(reset_email, new_pwd)
+                        except ValueError as exc:
+                            st.error(str(exc))
+                        else:
+                            if updated:
+                                st.success("Mot de passe regenere. Communiquez la nouvelle valeur a l'utilisateur.")
+                            else:
+                                st.error("Compte introuvable.")
+            st.caption("Astuce : creez un mot de passe temporaire puis invitez l'utilisateur a le modifier des la premiere connexion.")
