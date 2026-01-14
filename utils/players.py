@@ -23,11 +23,17 @@ def _player_identity(entry: Dict[str, Any]) -> Optional[str]:
     return f"name:{name}|{number or ''}"
 
 
-def _merge_entries(primary: List[Dict[str, Any]], supplements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _merge_entries(
+    primary: List[Dict[str, Any]], supplements: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
     if not supplements:
         return primary
     merged = list(primary)
-    seen = {identity for identity in (_player_identity(entry) for entry in merged) if identity}
+    seen = {
+        identity
+        for identity in (_player_identity(entry) for entry in merged)
+        if identity
+    }
     for entry in supplements:
         identity = _player_identity(entry)
         if not identity or identity in seen:
@@ -55,8 +61,14 @@ def _squad_entries(team_id: int, payload: Any) -> List[Dict[str, Any]]:
         for player in block.get("players") or []:
             if not isinstance(player, dict):
                 continue
-            stats_block = player.get("statistics") if isinstance(player.get("statistics"), dict) else {}
-            goals_stats = stats_block.get("goals") if isinstance(stats_block, dict) else {}
+            stats_block = (
+                player.get("statistics")
+                if isinstance(player.get("statistics"), dict)
+                else {}
+            )
+            goals_stats = (
+                stats_block.get("goals") if isinstance(stats_block, dict) else {}
+            )
             entries.append(
                 {
                     "player": {
@@ -72,16 +84,32 @@ def _squad_entries(team_id: int, payload: Any) -> List[Dict[str, Any]]:
                         {
                             "team": {"id": team_meta["id"], "name": team_meta["name"]},
                             "games": {
-                                "appearences": stats_block.get("appearences")
-                                if isinstance(stats_block, dict)
-                                else player.get("appearences")
-                                or player.get("appearances"),
-                                "lineups": stats_block.get("lineups") if isinstance(stats_block, dict) else None,
-                                "minutes": stats_block.get("minutes") if isinstance(stats_block, dict) else None,
+                                "appearences": (
+                                    stats_block.get("appearences")
+                                    if isinstance(stats_block, dict)
+                                    else player.get("appearences")
+                                    or player.get("appearances")
+                                ),
+                                "lineups": (
+                                    stats_block.get("lineups")
+                                    if isinstance(stats_block, dict)
+                                    else None
+                                ),
+                                "minutes": (
+                                    stats_block.get("minutes")
+                                    if isinstance(stats_block, dict)
+                                    else None
+                                ),
                                 "number": player.get("number"),
                                 "position": player.get("position"),
                             },
-                            "goals": {"total": goals_stats.get("total") if isinstance(goals_stats, dict) else None},
+                            "goals": {
+                                "total": (
+                                    goals_stats.get("total")
+                                    if isinstance(goals_stats, dict)
+                                    else None
+                                )
+                            },
                             "shots": {},
                             "passes": {},
                             "tackles": {},
@@ -98,18 +126,29 @@ def _squad_entries(team_id: int, payload: Any) -> List[Dict[str, Any]]:
     return entries
 
 
-def get_players(league_id: int, season: int, team_id: int, *, page: int = 1, normalized: bool = False) -> List[Any]:
+def get_players(
+    league_id: int,
+    season: int,
+    team_id: int,
+    *,
+    page: int = 1,
+    normalized: bool = False,
+) -> List[Any]:
     raw = api_get_players(league_id, season, team_id, page=page) or []
     if normalized:
         return normalize_player_list(raw if isinstance(raw, list) else [])
     return raw if isinstance(raw, list) else []
 
 
-def get_players_normalized(league_id: int, season: int, team_id: int, *, page: int = 1) -> List[PlayerInfo]:
+def get_players_normalized(
+    league_id: int, season: int, team_id: int, *, page: int = 1
+) -> List[PlayerInfo]:
     return get_players(league_id, season, team_id, page=page, normalized=True)
 
 
-def get_players_enriched(league_id: int, season: int, team_id: int, *, max_pages: int = 6) -> List[PlayerInfo]:
+def get_players_enriched(
+    league_id: int, season: int, team_id: int, *, max_pages: int = 6
+) -> List[PlayerInfo]:
     raw_list = api_get_players_for_team(
         league_id,
         season,
@@ -130,11 +169,27 @@ def get_players_enriched(league_id: int, season: int, team_id: int, *, max_pages
     if overrides:
         raw = _merge_entries(raw, overrides if isinstance(overrides, list) else [])
 
-    return normalize_player_list(raw)
+    # Normalisation puis suppression des doublons par id
+    players = normalize_player_list(raw)
+    seen_ids = set()
+    unique_players = []
+    for p in players:
+        if p.id not in seen_ids:
+            unique_players.append(p)
+            seen_ids.add(p.id)
+    return unique_players
 
 
-def get_full_roster(league_id: int, season: int, team_id: int, *, max_pages: int = 6) -> List[PlayerInfo]:
+def get_full_roster(
+    league_id: int, season: int, team_id: int, *, max_pages: int = 6
+) -> List[PlayerInfo]:
     return get_players_enriched(league_id, season, team_id, max_pages=max_pages)
 
 
-__all__ = ["get_players", "get_players_normalized", "get_players_enriched", "get_full_roster", "PlayerInfo"]
+__all__ = [
+    "get_players",
+    "get_players_normalized",
+    "get_players_enriched",
+    "get_full_roster",
+    "PlayerInfo",
+]

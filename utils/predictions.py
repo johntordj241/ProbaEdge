@@ -1922,6 +1922,7 @@ def _betting_tips(
     odds_snapshot = odds_map or {}
     tips: List[Dict[str, Any]] = []
     seen: set[str] = set()
+    primary_tip_label: Optional[str] = None
     MIN_DEFAULT_PROBABILITY = 0.60
     HTFT_MIN_PROBABILITY = max(0.55, MIN_DEFAULT_PROBABILITY - 0.05)
     HTFT_BASELINE = 0.50
@@ -1973,6 +1974,7 @@ def _betting_tips(
     if main_choice[1] < 0.2:
         reason += " (confiance reduite <20%, verifier contexte)."
     add_tip(label, main_choice[1], reason, min_probability=0.0)
+    primary_tip_label = label
 
     home_double = home_prob + draw_prob
     away_double = away_prob + draw_prob
@@ -2140,7 +2142,15 @@ def _betting_tips(
                 )
 
     tips.sort(key=lambda item: item["probability"], reverse=True)
-    return tips[:6]
+    selected = tips[:6]
+    if primary_tip_label:
+        primary_tip = next((tip for tip in tips if tip["label"] == primary_tip_label), None)
+        primary_included = any(tip["label"] == primary_tip_label for tip in selected)
+        if primary_tip and not primary_included:
+            selected.append(primary_tip)
+            selected.sort(key=lambda item: item["probability"], reverse=True)
+            selected = selected[:6]
+    return selected
 
 
 def _note_ia_lines(

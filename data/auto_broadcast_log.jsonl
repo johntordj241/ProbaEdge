@@ -42,3 +42,8 @@
 {"fixture_id": 1489431, "template": "pre_match", "timestamp": "2026-01-12T23:17:04.652182+00:00"}
 {"fixture_id": 1477047, "template": "edge_alert", "timestamp": "2026-01-12T23:17:05.168164+00:00"}
 {"fixture_id": 1477047, "template": "edge_alert", "timestamp": "2026-01-13T11:11:01.909538+00:00"}
+{"fixture_id": 1477047, "template": "edge_alert", "timestamp": "2026-01-13T14:05:59.836511+00:00"}
+{"fixture_id": 1477047, "template": "pre_match", "timestamp": "2026-01-13T16:17:03.391516+00:00"}
+{"fixture_id": 1477047, "template": "edge_alert", "timestamp": "2026-01-13T16:17:03.955953+00:00"}
+{"fixture_id": 1477047, "template": "pre_match", "timestamp": "2026-01-13T18:17:04.426110+00:00"}
+{"fixture_id": 1477047, "template": "edge_alert", "timestamp": "2026-01-13T18:17:05.018013+00:00"}

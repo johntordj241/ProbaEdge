@@ -92,7 +92,10 @@ def show_standings(
         form_rows.append({"team": team_info.get("name", "?"), "form": form_value})
 
     if scope_key != "all":
-        rows.sort(key=lambda item: (item["Pts"] or 0, item["+/-"] or 0, item["Buts +"] or 0), reverse=True)
+        rows.sort(
+            key=lambda item: (item["Pts"] or 0, item["+/-"] or 0, item["Buts +"] or 0),
+            reverse=True,
+        )
         for idx, row in enumerate(rows, start=1):
             row["Pos"] = idx
 
@@ -103,12 +106,15 @@ def show_standings(
         st.subheader("Forme visuelle (5 derniers matches)")
         st.markdown(render_form_table(form_rows), unsafe_allow_html=True)
         if form_scope_missing and scope_key != "all":
-            st.info("Les données de forme domicile/extérieur ne sont pas fournies par l'API pour cette ligue. Affichage de la forme globale à la place.")
+            st.info(
+                "Les données de forme domicile/extérieur ne sont pas fournies par l'API pour cette ligue. Affichage de la forme globale à la place."
+            )
 
     st.markdown("---")
     st.subheader("Widget officiel - Classement")
     if scope_key != "all":
-        st.info("Le widget officiel n'affiche que les stats globales. Sélectionnez 'Tous' pour le consulter.")
+        st.warning(
+            "Le widget officiel n'affiche que les stats globales. Sélectionnez 'Tous' pour le consulter.\n\nLe tableau ci-dessus est bien filtré selon votre choix, mais le widget reste figé par l'API."
+        )
     else:
         render_widget("standings", height=720, league=league_id, season=season)
-
