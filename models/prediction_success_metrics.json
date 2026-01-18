@@ -1,11 +1,10 @@
 {
-  "status": "skipped",
-  "reason": "Insufficient positive/negative samples",
-  "samples": 2,
-  "class_distribution": {
-    "1": 2
-  },
-  "generated_at": "2025-10-25T14:11:03.426409+00:00",
+  "accuracy": 0.4421052631578947,
+  "roc_auc": 0.4448888888888889,
+  "samples": 379,
+  "train_samples": 284,
+  "test_samples": 95,
+  "generated_at": "2026-01-15T15:54:59.480111+00:00",
   "features": [
     "feature_home_draw_diff",
     "feature_home_away_diff",

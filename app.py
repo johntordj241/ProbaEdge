@@ -11,6 +11,7 @@ if str(ROOT_DIR) not in sys.path:
 import streamlit as st
 
 from utils.auth_ui import ensure_authenticated, render_account_sidebar
+from utils.session_persistence import init_session_state
 from utils.coach_ui import render_coach_widget
 from utils.cards import show_cards
 from utils.constants import DEFAULT_LEAGUE_ID, DEFAULT_SEASON, DEFAULT_TEAM_ID
@@ -68,6 +69,9 @@ DEFAULT_LEAGUE_ID = 61
 DEFAULT_SEASON = 2025
 DEFAULT_TEAM_ID = 85
 LOGO_PATH = ROOT_DIR / "assets" / "logo_proba_edge.svg"
+
+# 🔓 Charger la session persistante au démarrage
+init_session_state()
 
 if not ensure_authenticated():
     st.stop()

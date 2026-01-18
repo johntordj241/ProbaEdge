@@ -6,6 +6,7 @@ import streamlit as st
 
 from .auth import authenticate_user, create_user
 from .subscription import plan_label, normalize_plan, UPGRADE_URL
+from .session_persistence import init_session_state, update_session_state, clear_session
 
 LANDING_PAGE_STYLES = """
 <style>
@@ -101,13 +102,19 @@ def _login_form(show_heading: bool = True) -> bool:
     with st.form("login_form"):
         email = st.text_input("Email", key="login_email", placeholder="vous@club.com")
         password = st.text_input(
-            "Mot de passe", type="password", key="login_password", placeholder="********"
+            "Mot de passe",
+            type="password",
+            key="login_password",
+            placeholder="********",
         )
-        submitted = st.form_submit_button("Continuer vers l'espace prive", use_container_width=True)
+        submitted = st.form_submit_button(
+            "Continuer vers l'espace prive", use_container_width=True
+        )
     if submitted:
         user = authenticate_user(email, password)
         if user:
-            st.session_state["auth_user"] = user
+            # Sauvegarder la session localement
+            update_session_state(user)
             st.success("Connexion journalisee.")
             st.experimental_rerun()
             return True
@@ -120,10 +127,17 @@ def _register_form(show_heading: bool = True) -> bool:
     if show_heading:
         st.subheader("Demande d'acces")
     with st.form("register_form"):
-        name = st.text_input("Nom complet", key="register_name", placeholder="Analyste Ligue 1")
-        email = st.text_input("Email", key="register_email", placeholder="vous@club.com")
+        name = st.text_input(
+            "Nom complet", key="register_name", placeholder="Analyste Ligue 1"
+        )
+        email = st.text_input(
+            "Email", key="register_email", placeholder="vous@club.com"
+        )
         password = st.text_input(
-            "Mot de passe", type="password", key="register_password", placeholder="Min. 8 caracteres"
+            "Mot de passe",
+            type="password",
+            key="register_password",
+            placeholder="Min. 8 caracteres",
         )
         confirm = st.text_input(
             "Confirmer le mot de passe",
@@ -146,7 +160,8 @@ def _register_form(show_heading: bool = True) -> bool:
         except ValueError as exc:
             st.error(str(exc))
             return False
-        st.session_state["auth_user"] = user
+        # Sauvegarder la session localement
+        update_session_state(user)
         st.success("Acces ouvert.")
         st.experimental_rerun()
         return True
@@ -155,6 +170,9 @@ def _register_form(show_heading: bool = True) -> bool:
 
 
 def ensure_authenticated() -> bool:
+    # Initialiser la session avec les données sauvegardées
+    init_session_state()
+
     if st.session_state.get("auth_user"):
         return True
 
@@ -242,7 +260,9 @@ def ensure_authenticated() -> bool:
             with tabs[1]:
                 _register_form(show_heading=False)
             st.markdown("</div>", unsafe_allow_html=True)
-            st.caption("Les demandes peuvent rester en file d'attente sans delai garanti.")
+            st.caption(
+                "Les demandes peuvent rester en file d'attente sans delai garanti."
+            )
 
     st.info("Si la donnee est insuffisante, le protocole privilegie la mise en pause.")
     return False
@@ -260,5 +280,8 @@ def render_account_sidebar(container: Any) -> None:
     container.write(f"[Gerer mon abonnement]({UPGRADE_URL})")
     if container.button("Se deconnecter", key="logout_button"):
         st.session_state.pop("auth_user", None)
+        st.session_state.pop("auth_token", None)
+        # Effacer aussi la session sauvegardée
+        clear_session()
         container.success("Deconnexion effectuee.")
         st.experimental_rerun()

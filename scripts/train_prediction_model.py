@@ -110,7 +110,9 @@ def _compute_success(df: pd.DataFrame) -> pd.Series:
     return pd.Series(success, index=df.index, dtype="float64")
 
 
-def _brier_score_multiclass(y_true: np.ndarray, proba: np.ndarray, classes: np.ndarray) -> float:
+def _brier_score_multiclass(
+    y_true: np.ndarray, proba: np.ndarray, classes: np.ndarray
+) -> float:
     class_to_index = {str(label): idx for idx, label in enumerate(classes)}
     y_one_hot = np.zeros_like(proba)
     for i, label in enumerate(y_true):
@@ -192,7 +194,9 @@ def train_success_model(
             "status": "skipped",
             "reason": "Insufficient positive/negative samples",
             "samples": int(len(dataset)),
-            "class_distribution": {str(k): int(v) for k, v in pd.Series(y).value_counts().to_dict().items()},
+            "class_distribution": {
+                str(k): int(v) for k, v in pd.Series(y).value_counts().to_dict().items()
+            },
             "generated_at": pd.Timestamp.utcnow().isoformat(),
             "features": FEATURE_COLUMNS,
         }
@@ -218,7 +222,9 @@ def train_success_model(
     proba = model.predict_proba(X_test)[:, 1]
     preds = model.predict(X_test)
     accuracy = accuracy_score(y_test, preds)
-    roc_auc = roc_auc_score(y_test, proba) if len(np.unique(y_test)) > 1 else float("nan")
+    roc_auc = (
+        roc_auc_score(y_test, proba) if len(np.unique(y_test)) > 1 else float("nan")
+    )
 
     model_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, model_path)
@@ -258,7 +264,9 @@ def train_outcome_model(
             "status": "skipped",
             "reason": "Insufficient class diversity",
             "samples": int(len(dataset)),
-            "class_distribution": {str(k): int(v) for k, v in pd.Series(y).value_counts().to_dict().items()},
+            "class_distribution": {
+                str(k): int(v) for k, v in pd.Series(y).value_counts().to_dict().items()
+            },
             "generated_at": pd.Timestamp.utcnow().isoformat(),
         }
         if model_path.exists():
@@ -278,7 +286,6 @@ def train_outcome_model(
                 "model",
                 LogisticRegression(
                     max_iter=2000,
-                    multi_class="multinomial",
                     class_weight="balanced",
                 ),
             ),
@@ -303,7 +310,9 @@ def train_outcome_model(
     logloss = log_loss(y_test, proba, labels=pipeline.classes_)
     report = classification_report(y_test, preds, output_dict=True)
     brier = _brier_score_multiclass(y_test_array, proba, pipeline.classes_)
-    ece, reliability = _expected_calibration_error(y_test_array, proba, pipeline.classes_)
+    ece, reliability = _expected_calibration_error(
+        y_test_array, proba, pipeline.classes_
+    )
 
     model_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipeline, model_path)
@@ -314,7 +323,9 @@ def train_outcome_model(
         "samples": int(len(dataset)),
         "train_samples": int(len(X_train)),
         "test_samples": int(len(X_test)),
-        "class_distribution": {str(k): int(v) for k, v in y.value_counts().to_dict().items()},
+        "class_distribution": {
+            str(k): int(v) for k, v in y.value_counts().to_dict().items()
+        },
         "classification_report": report,
         "brier_score": brier,
         "ece": ece,
@@ -329,10 +340,24 @@ def train_outcome_model(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Entraînement des modèles prédictifs IA")
-    parser.add_argument("--output-dataset", type=Path, help="Chemin CSV temporaire pour le dataset exporté")
-    parser.add_argument("--model-path", type=Path, default=Path("models") / "prediction_success_model.joblib")
-    parser.add_argument("--metrics-path", type=Path, default=Path("models") / "prediction_success_metrics.json")
+    parser = argparse.ArgumentParser(
+        description="Entraînement des modèles prédictifs IA"
+    )
+    parser.add_argument(
+        "--output-dataset",
+        type=Path,
+        help="Chemin CSV temporaire pour le dataset exporté",
+    )
+    parser.add_argument(
+        "--model-path",
+        type=Path,
+        default=Path("models") / "prediction_success_model.joblib",
+    )
+    parser.add_argument(
+        "--metrics-path",
+        type=Path,
+        default=Path("models") / "prediction_success_metrics.json",
+    )
     parser.add_argument(
         "--outcome-model-path",
         type=Path,
@@ -359,7 +384,9 @@ def main() -> None:
     )
     outcome_status = outcome_metrics.get("status")
     if outcome_status == "skipped":
-        print("Modèle outcome ignoré (échantillon insuffisant) :", args.outcome_model_path)
+        print(
+            "Modèle outcome ignoré (échantillon insuffisant) :", args.outcome_model_path
+        )
     else:
         print("Modèle outcome entraîné :", args.outcome_model_path)
     print(json.dumps(outcome_metrics, indent=2))

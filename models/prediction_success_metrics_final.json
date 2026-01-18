@@ -1,0 +1,21 @@
+{
+  "version": "final_optimized",
+  "accuracy": 0.6213592233009708,
+  "roc_auc": 0.6888276947285601,
+  "samples": 411,
+  "features_count": 8,
+  "features": [
+    "feature_max_prob",
+    "feature_total_pick_over",
+    "prob_draw",
+    "feature_over_under_diff",
+    "prob_over_2_5",
+    "prob_under_2_5",
+    "prob_away",
+    "feature_home_draw_diff"
+  ],
+  "improvements_from_baseline": {
+    "accuracy_delta_percent": 0.9359223300970831,
+    "roc_auc_delta_percent": -0.717230527143986
+  }
+}

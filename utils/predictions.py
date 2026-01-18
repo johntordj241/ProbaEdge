@@ -16,12 +16,22 @@ import pandas as pd
 import streamlit as st
 
 from .bankroll import BankrollSettings, suggest_stake
-from .ai_ import analyse_match_with_ai, commentate_match_with_ai, is_openai_configured, AIAnalysisError
+from .ai_ import (
+    analyse_match_with_ai,
+    commentate_match_with_ai,
+    is_openai_configured,
+    AIAnalysisError,
+)
 from .ai_scenarios import (
     DEFAULT_AI_SCENARIOS,
     available_scenarios,
     build_scenario_payload,
     scenario_instruction,
+)
+from .ml_dashboard import show_ml_analysis_dashboard
+from .smart_recommendations import (
+    render_smart_recommendations_ui,
+    create_auto_betting_list,
 )
 from .alt_predictor import alt_projection_snapshot, probability_delta
 from .notifications import notify_event
@@ -96,7 +106,9 @@ def _seed_scene_state(config: Optional[Dict[str, Any]]) -> None:
         if value is not None:
             st.session_state[key] = value
 
-    highlight = int(config.get("highlight_threshold_pts", int(OPPORTUNITY_EDGE_THRESHOLD * 100)))
+    highlight = int(
+        config.get("highlight_threshold_pts", int(OPPORTUNITY_EDGE_THRESHOLD * 100))
+    )
     highlight = min(30, max(1, highlight))
     _set_state("predictions_highlight_threshold", highlight)
     _set_state("predictions_scope_select", config.get("scope"))
@@ -144,7 +156,9 @@ def _compose_scene_config(
         "over_thresholds": over_thresholds,
         "under_filters_enabled": bool(under_settings.get("enabled")),
         "under_min_prob": (
-            int(under_settings.get("min_prob")) if under_settings.get("min_prob") is not None else None
+            int(under_settings.get("min_prob"))
+            if under_settings.get("min_prob") is not None
+            else None
         ),
         "under_limit_intensity": bool(under_settings.get("limit_intensity")),
         "under_max_intensity": int(under_settings.get("max_intensity", 65)),
@@ -209,7 +223,9 @@ def _top_value_opportunities(
         probability = tip.get("probability")
         if probability in (None, ""):
             continue
-        odds = _odds_for_tip(tip, odds_map, home_name, away_name) or bankroll.default_odds
+        odds = (
+            _odds_for_tip(tip, odds_map, home_name, away_name) or bankroll.default_odds
+        )
         suggestion = suggest_stake(probability, odds, bankroll)
         edge = suggestion.get("edge")
         if edge is None or edge < edge_threshold:
@@ -224,7 +240,9 @@ def _top_value_opportunities(
                 "reason": tip.get("reason", ""),
             }
         )
-    highlights.sort(key=lambda item: (item["edge_pct"], item.get("confidence") or 0), reverse=True)
+    highlights.sort(
+        key=lambda item: (item["edge_pct"], item.get("confidence") or 0), reverse=True
+    )
     return highlights[:max_items]
 
 
@@ -273,7 +291,9 @@ AI_PRESSURE_FIELDS: Tuple[str, ...] = (
 _LOCAL_FIXTURE_CACHE: Dict[int, Dict[str, Any]] = {}
 
 
-def _topscorers_best_effort(league_id: int, season: int) -> tuple[list[dict[str, Any]], Optional[int]]:
+def _topscorers_best_effort(
+    league_id: int, season: int
+) -> tuple[list[dict[str, Any]], Optional[int]]:
     current = get_topscorers(league_id, season) or []
     if current:
         return current, None
@@ -286,7 +306,9 @@ def _topscorers_best_effort(league_id: int, season: int) -> tuple[list[dict[str,
     return [], None
 
 
-def _players_best_effort(league_id: int, season: int, team_id: Optional[int]) -> list[dict[str, Any]]:
+def _players_best_effort(
+    league_id: int, season: int, team_id: Optional[int]
+) -> list[dict[str, Any]]:
     if not team_id:
         return []
     return get_players_for_team(league_id, season, team_id)
@@ -380,7 +402,9 @@ def _match_summary_lines(
         if weather_desc:
             lines.append(f":cloud: Meteo : {weather_desc}")
         elif not weather.is_available():
-            lines.append(":cloud: Meteo : non disponible (ajoutez OPENWEATHER_API_KEY).")
+            lines.append(
+                ":cloud: Meteo : non disponible (ajoutez OPENWEATHER_API_KEY)."
+            )
     return lines
 
 
@@ -434,10 +458,17 @@ def _load_fixture_with_details(
         cache_entry = _LOCAL_FIXTURE_CACHE.get(fixture_id)
     if cache_entry:
         fetched_at = cache_entry.get("fetched_at")
-        if isinstance(fetched_at, datetime) and (now - fetched_at).total_seconds() <= cache_ttl_seconds:
+        if (
+            isinstance(fetched_at, datetime)
+            and (now - fetched_at).total_seconds() <= cache_ttl_seconds
+        ):
             origin = cache_entry.get("source", "cache")
             source_label = "cache" if origin == "api" else origin
-            return deepcopy(cache_entry["data"]), cache_entry.get("updated_at"), source_label
+            return (
+                deepcopy(cache_entry["data"]),
+                cache_entry.get("updated_at"),
+                source_label,
+            )
     try:
         details = get_fixture_details(int(fixture_id)) or []
     except Exception:
@@ -587,14 +618,18 @@ def _stat_label_variants(label: str) -> set[str]:
     normalized = _normalize_stat_label(label)
     variants = {normalized}
     for base_label, options in STAT_LABEL_ALIASES.items():
-        normalized_options = {_normalize_stat_label(opt) for opt in {base_label, *options}}
+        normalized_options = {
+            _normalize_stat_label(opt) for opt in {base_label, *options}
+        }
         if normalized in normalized_options:
             variants.update(normalized_options)
             break
     return variants
 
 
-def _stat_value(statistics: List[Dict[str, Any]], team_id: int, label: str) -> Optional[float]:
+def _stat_value(
+    statistics: List[Dict[str, Any]], team_id: int, label: str
+) -> Optional[float]:
     targets = _stat_label_variants(label)
     for block in statistics or []:
         team_block = block.get("team") or {}
@@ -682,7 +717,10 @@ def _live_match_pressure(
             if event_minute >= threshold:
                 event_type = str(event.get("type") or "").lower()
                 detail = str(event.get("detail") or "").lower()
-                if event_type in {"goal", "shot", "dangerous attack"} or "shot" in detail:
+                if (
+                    event_type in {"goal", "shot", "dangerous attack"}
+                    or "shot" in detail
+                ):
                     recent_events += 1
 
     pressure_score = 0.0
@@ -808,8 +846,16 @@ def _core_live_stat_rows(
 
     rows: List[Dict[str, str]] = []
     for label, stat_key, kind in metrics:
-        home_value = _stat_value(statistics, home_team_id, stat_key) if home_team_id is not None else None
-        away_value = _stat_value(statistics, away_team_id, stat_key) if away_team_id is not None else None
+        home_value = (
+            _stat_value(statistics, home_team_id, stat_key)
+            if home_team_id is not None
+            else None
+        )
+        away_value = (
+            _stat_value(statistics, away_team_id, stat_key)
+            if away_team_id is not None
+            else None
+        )
         if home_value is None and away_value is None:
             continue
         rows.append(
@@ -879,7 +925,10 @@ def _recent_bet_streak(
     if history.empty:
         return None
     df = history.copy()
-    mask = df.get("bet_selection", pd.Series(dtype=str)).fillna("").astype(str).str.strip() != ""
+    mask = (
+        df.get("bet_selection", pd.Series(dtype=str)).fillna("").astype(str).str.strip()
+        != ""
+    )
     confirmed = df[mask]
     if confirmed.empty:
         return None
@@ -945,7 +994,15 @@ def _evaluate_over_under_filters(
     under_cfg = filters.get("under") or {}
     if under_cfg.get("enabled"):
         min_prob = under_cfg.get("min_prob")
-        prob_under = float(markets.get("under_2_5", max(0.0, 1.0 - float(markets.get("over_2_5", 0.0) or 0.0)))) * 100.0
+        prob_under = (
+            float(
+                markets.get(
+                    "under_2_5",
+                    max(0.0, 1.0 - float(markets.get("over_2_5", 0.0) or 0.0)),
+                )
+            )
+            * 100.0
+        )
         if min_prob is not None and prob_under < float(min_prob):
             messages.append(f"Under 2.5 estimé à {prob_under:.1f}% (< {min_prob}%).")
         if under_cfg.get("limit_intensity"):
@@ -1003,12 +1060,18 @@ def _render_combo_cart(bankroll_settings: BankrollSettings) -> None:
     cart = _combo_cart()
     st.subheader("Panier combinÃ©")
     if not cart:
-        st.caption("Ajoute des paris depuis les matches pour construire un ticket combinÃ©.")
+        st.caption(
+            "Ajoute des paris depuis les matches pour construire un ticket combinÃ©."
+        )
         return
 
     selections = list(cart.items())
     odds = [entry["odd"] for _, entry in selections if entry.get("odd")]
-    probs = [entry["probability"] for _, entry in selections if entry.get("probability") is not None]
+    probs = [
+        entry["probability"]
+        for _, entry in selections
+        if entry.get("probability") is not None
+    ]
 
     combined_odd = math.prod(odds) if odds else None
     combined_prob = math.prod(probs) if probs else None
@@ -1123,7 +1186,9 @@ def _tip_outcome_state(
         if home_goals > 0 and away_goals > 0:
             return "losing"
         return "open"
-    if "les deux equipes marquent" in label_low or ("btts" in label_low and "non" not in label_low):
+    if "les deux equipes marquent" in label_low or (
+        "btts" in label_low and "non" not in label_low
+    ):
         if home_goals > 0 and away_goals > 0:
             return "winning"
         return "open"
@@ -1239,7 +1304,9 @@ def _live_probability_for_tip(
         if away_low and away_low in label_low:
             return market_prob("away_over_1_5"), "team_total"
 
-    if "les deux equipes marquent" in label_low or ("btts" in label_low and "non" not in label_low):
+    if "les deux equipes marquent" in label_low or (
+        "btts" in label_low and "non" not in label_low
+    ):
         prob = market_prob("btts_yes")
         if prob is not None:
             return prob, "btts_yes"
@@ -1259,7 +1326,7 @@ def _live_probability_for_tip(
             return market_prob("away_win_by_2"), "handicap"
 
     if label_low.startswith("mi-temps/fin"):
-        suffix = label[len("Mi-temps/Fin"):].strip()
+        suffix = label[len("Mi-temps/Fin") :].strip()
         if "/" in suffix:
             ht_part, ft_part = [part.strip().lower() for part in suffix.split("/", 1)]
 
@@ -1268,9 +1335,13 @@ def _live_probability_for_tip(
                     return None
                 if segment.startswith("nul") or segment.startswith("draw"):
                     return "N"
-                if home_low and (segment.startswith(home_low) or home_low.startswith(segment)):
+                if home_low and (
+                    segment.startswith(home_low) or home_low.startswith(segment)
+                ):
                     return "1"
-                if away_low and (segment.startswith(away_low) or away_low.startswith(segment)):
+                if away_low and (
+                    segment.startswith(away_low) or away_low.startswith(segment)
+                ):
                     return "2"
                 return None
 
@@ -1286,7 +1357,9 @@ def _live_probability_for_tip(
         if match:
             final_home = int(match.group(1))
             final_away = int(match.group(2))
-            prob = _scoreline_probability(projection_matrix, status, final_home, final_away)
+            prob = _scoreline_probability(
+                projection_matrix, status, final_home, final_away
+            )
             if prob is not None:
                 return prob, "score_exact"
 
@@ -1344,9 +1417,7 @@ def _cashout_recommendations(
             expected_ev = prob * (odd - 1.0) - (1.0 - prob)
 
         action = "hold"
-        reason = (
-            f"Probabilite live {prob * 100:.1f}% | cote {odd:.2f} | minute {int(elapsed)}."
-        )
+        reason = f"Probabilite live {prob * 100:.1f}% | cote {odd:.2f} | minute {int(elapsed)}."
         if pressure_score >= 0.6:
             reason += f" Pression {pressure_label or 'elevee'}."
 
@@ -1364,9 +1435,7 @@ def _cashout_recommendations(
             if elapsed >= 80:
                 if tip_kind in {"under", "score_exact"} and risk_remaining > 0.08:
                     action = "cashout"
-                    reason += (
-                        f" Dernieres minutes : risque residuel {risk_remaining * 100:.1f}%."
-                    )
+                    reason += f" Dernieres minutes : risque residuel {risk_remaining * 100:.1f}%."
                     decisive_cashout = True
                 elif odd >= 3.0 and prob > 0.6:
                     action = "cashout"
@@ -1412,6 +1481,7 @@ def _cashout_recommendations(
             }
         )
     return recommendations
+
 
 def _match_intensity_score_with_weights(
     home_lambda: float,
@@ -1474,11 +1544,16 @@ def _match_intensity_score(
         is_live=is_live,
     )
 
+
 ODDS_MARKET_MAIN = {"1x2", "match winner", "match result", "fulltime result"}
 ODDS_MARKET_DOUBLE = {"double chance"}
 ODDS_MARKET_TOTAL = {"over/under", "over under", "total goals"}
 ODDS_MARKET_BTTS = {"both teams to score", "btts"}
-ODDS_MARKET_BTTS_TOTAL = {"both teams to score & total goals", "btts & total", "btts and total goals"}
+ODDS_MARKET_BTTS_TOTAL = {
+    "both teams to score & total goals",
+    "btts & total",
+    "btts and total goals",
+}
 ODDS_MARKET_DRAW_NO_BET = {"draw no bet", "dnb"}
 ODDS_MARKET_HANDICAP = {"handicap", "asian handicap", "handicap result"}
 ODDS_MARKET_TEAM_TOTAL = {"team total goals", "team goals", "goals over/under"}
@@ -1495,6 +1570,7 @@ def _normalize_odds_key(market: str, label: str) -> Optional[str]:
 
     def has_threshold(value: str) -> bool:
         return value in normalized
+
     has_over = bool({"over", "plus", "sup"} & tokens) or "over" in normalized
     has_under = bool({"under", "moins", "inf"} & tokens) or "under" in normalized
     if market in ODDS_MARKET_MAIN:
@@ -1539,12 +1615,18 @@ def _normalize_odds_key(market: str, label: str) -> Optional[str]:
     if market in ODDS_MARKET_BTTS_TOTAL:
         if has_threshold("2.5") and ({"yes", "oui"} & tokens):
             return "btts_yes_over_2_5"
-    if market in ODDS_MARKET_DRAW_NO_BET or "drawnobet" in compressed or tokens & {"dnb"}:
+    if (
+        market in ODDS_MARKET_DRAW_NO_BET
+        or "drawnobet" in compressed
+        or tokens & {"dnb"}
+    ):
         if {"1", "home", "w1"} & tokens:
             return "home_draw_no_bet"
         if {"2", "away", "w2"} & tokens:
             return "away_draw_no_bet"
-    if market in ODDS_MARKET_HANDICAP and any(edge in compressed for edge in {"-1", "-1.0"}):
+    if market in ODDS_MARKET_HANDICAP and any(
+        edge in compressed for edge in {"-1", "-1.0"}
+    ):
         if {"1", "home", "w1"} & tokens:
             return "home_win_by_2"
         if {"2", "away", "w2"} & tokens:
@@ -1556,7 +1638,11 @@ def _normalize_odds_key(market: str, label: str) -> Optional[str]:
             return "clean_sheet_home"
         if {"2", "away", "w2"} & tokens or "away" in normalized:
             return "clean_sheet_away"
-    if ("btts" in normalized or "both teams" in normalized) and "over" in normalized and has_threshold("2.5"):
+    if (
+        ("btts" in normalized or "both teams" in normalized)
+        and "over" in normalized
+        and has_threshold("2.5")
+    ):
         return "btts_yes_over_2_5"
     if "half time" in normalized or "mi-temps" in normalized or "ht/ft" in normalized:
         tokens = normalized.split()
@@ -1569,9 +1655,9 @@ def _normalize_odds_key(market: str, label: str) -> Optional[str]:
             ht, ft = "1", "2"
         elif "x/1" in normalized or "draw/home" in normalized or "n/1" in normalized:
             ht, ft = "N", "1"
-        elif ("x/x" in normalized or "draw/draw" in normalized or "n/n" in normalized):
+        elif "x/x" in normalized or "draw/draw" in normalized or "n/n" in normalized:
             ht, ft = "N", "N"
-        elif ("x/2" in normalized or "draw/away" in normalized or "n/2" in normalized):
+        elif "x/2" in normalized or "draw/away" in normalized or "n/2" in normalized:
             ht, ft = "N", "2"
         elif "2/1" in normalized or "away/home" in normalized:
             ht, ft = "2", "1"
@@ -1582,7 +1668,10 @@ def _normalize_odds_key(market: str, label: str) -> Optional[str]:
         if ht and ft:
             return f"htft_{ht}/{ft}"
     if any(tag in market for tag in ODDS_MARKET_EXACT_SCORE):
-        if any(segment in market for segment in {"first half", "1st half", "second half", "2nd half"}):
+        if any(
+            segment in market
+            for segment in {"first half", "1st half", "second half", "2nd half"}
+        ):
             return None
         match = re.search(r"(\d+)\s*[:\-\u2013\u2014]\s*(\d+)", normalized)
         if match:
@@ -1722,14 +1811,18 @@ def _odds_for_tip(
     if label.startswith("btts : non") or "btts : non" in label:
         return odds_map.get("btts_no")
     if label.startswith("mi-temps/fin"):
-        suffix = label[len("mi-temps/fin"):].strip()
+        suffix = label[len("mi-temps/fin") :].strip()
         if "/" in suffix:
             ht_part, ft_part = [part.strip(" ()") for part in suffix.split("/", 1)]
 
             def resolve(segment: str) -> Optional[str]:
                 if not segment:
                     return None
-                if segment.startswith("nul") or segment.startswith("draw") or segment.startswith("n "):
+                if (
+                    segment.startswith("nul")
+                    or segment.startswith("draw")
+                    or segment.startswith("n ")
+                ):
                     return "N"
                 if home_name and segment.startswith(home_name):
                     return "1"
@@ -1775,7 +1868,11 @@ def _markets_from_matrix(
             "away_over_1_5": 1.0 if current_away >= 2 else 0.0,
             "home_win_by_2": 1.0 if (current_home - current_away) >= 2 else 0.0,
             "away_win_by_2": 1.0 if (current_away - current_home) >= 2 else 0.0,
-            "btts_yes_over_2_5": 1.0 if (current_home > 0 and current_away > 0 and total_goals >= 3) else 0.0,
+            "btts_yes_over_2_5": (
+                1.0
+                if (current_home > 0 and current_away > 0 and total_goals >= 3)
+                else 0.0
+            ),
         }
         base["under_0_5"] = 1.0 - base["over_0_5"]
         base["under_1_5"] = 1.0 - base["over_1_5"]
@@ -1878,7 +1975,10 @@ def _markets_from_matrix(
     second_away = _poisson_row(max(0.0, lambda_away / 2.0))
 
     halftime_probs = {"ht_home": 0.0, "ht_draw": 0.0, "ht_away": 0.0}
-    htft_probs = {f"htft_{combo}": 0.0 for combo in ["1/1", "1/N", "1/2", "N/1", "N/N", "N/2", "2/1", "2/N", "2/2"]}
+    htft_probs = {
+        f"htft_{combo}": 0.0
+        for combo in ["1/1", "1/N", "1/2", "N/1", "N/N", "N/2", "2/1", "2/N", "2/2"]
+    }
 
     for h_ht, p_h_ht in enumerate(half_home):
         for a_ht, p_a_ht in enumerate(half_away):
@@ -1886,7 +1986,9 @@ def _markets_from_matrix(
             if p_ht <= 0:
                 continue
             ht_token = _result_token(h_ht, a_ht)
-            halftime_probs[f"ht_{'home' if ht_token == '1' else 'draw' if ht_token == 'N' else 'away'}"] += p_ht
+            halftime_probs[
+                f"ht_{'home' if ht_token == '1' else 'draw' if ht_token == 'N' else 'away'}"
+            ] += p_ht
             for h_2, p_h_2 in enumerate(second_home):
                 for a_2, p_a_2 in enumerate(second_away):
                     p_total = p_ht * p_h_2 * p_a_2
@@ -1929,7 +2031,13 @@ def _betting_tips(
     MIN_SCORE_PROBABILITY = 0.05
     EDGE_THRESHOLD = 0.02
 
-    def add_tip(label: str, probability: float, reason: str, *, min_probability: float = MIN_DEFAULT_PROBABILITY) -> None:
+    def add_tip(
+        label: str,
+        probability: float,
+        reason: str,
+        *,
+        min_probability: float = MIN_DEFAULT_PROBABILITY,
+    ) -> None:
         if label in seen or probability <= 0 or probability < min_probability:
             return
         tips.append(
@@ -2042,9 +2150,7 @@ def _betting_tips(
             ". ".join(reason_parts),
         )
     elif adjusted_under >= MIN_DEFAULT_PROBABILITY and under_edge >= EDGE_THRESHOLD:
-        reason_parts = [
-            "Projection de buts moderee"
-        ]
+        reason_parts = ["Projection de buts moderee"]
         if odds_snapshot.get("under_2_5"):
             reason_parts.append(f"cote {odds_snapshot['under_2_5']:.2f}")
         reason_parts.append(f"value {under_edge*100:.1f}%")
@@ -2144,7 +2250,9 @@ def _betting_tips(
     tips.sort(key=lambda item: item["probability"], reverse=True)
     selected = tips[:6]
     if primary_tip_label:
-        primary_tip = next((tip for tip in tips if tip["label"] == primary_tip_label), None)
+        primary_tip = next(
+            (tip for tip in tips if tip["label"] == primary_tip_label), None
+        )
         primary_included = any(tip["label"] == primary_tip_label for tip in selected)
         if primary_tip and not primary_included:
             selected.append(primary_tip)
@@ -2195,7 +2303,9 @@ def _note_ia_lines(
         xg_home = pressure.get("xg_home")
         xg_away = pressure.get("xg_away")
         if xg_home is not None and xg_away is not None:
-            bullets.append(f"xG cumules : {home_strength.name} {xg_home:.2f} vs {away_strength.name} {xg_away:.2f}.")
+            bullets.append(
+                f"xG cumules : {home_strength.name} {xg_home:.2f} vs {away_strength.name} {xg_away:.2f}."
+            )
         corners_home = pressure.get("corners_home")
         corners_away = pressure.get("corners_away")
         if corners_home is not None and corners_away is not None:
@@ -2228,7 +2338,9 @@ def _note_ia_lines(
     elif not weather.is_available():
         context_bits.append("Meteo : non disponible (ajoutez OPENWEATHER_API_KEY).")
     if getattr(context, "halftime", False):
-        context_bits.append(context.halftime_message or "Reevaluation mi-temps appliquee.")
+        context_bits.append(
+            context.halftime_message or "Reevaluation mi-temps appliquee."
+        )
     if baseline_probs:
         delta_home = (probs.get("home", 0.0) - baseline_probs.get("home", 0.0)) * 100.0
         delta_draw = (probs.get("draw", 0.0) - baseline_probs.get("draw", 0.0)) * 100.0
@@ -2370,14 +2482,18 @@ def _update_history_if_finished(
     )
 
 
-def _round_pct(value: Any, *, multiplier: float = 100.0, ndigits: int = 1) -> Optional[float]:
+def _round_pct(
+    value: Any, *, multiplier: float = 100.0, ndigits: int = 1
+) -> Optional[float]:
     try:
         return round(float(value) * multiplier, ndigits)
     except (TypeError, ValueError):
         return None
 
 
-def _probability_pct_map(values: Mapping[str, Any], keys: Sequence[str]) -> Dict[str, float]:
+def _probability_pct_map(
+    values: Mapping[str, Any], keys: Sequence[str]
+) -> Dict[str, float]:
     snapshot: Dict[str, float] = {}
     for key in keys:
         pct = _round_pct(values.get(key), ndigits=2)
@@ -2400,7 +2516,9 @@ def _tip_snapshot(tips: List[Dict[str, Any]], limit: int = 4) -> List[Dict[str, 
     return snapshot
 
 
-def _top_scores_snapshot(scores: List[Dict[str, Any]], limit: int = 5) -> List[Dict[str, Any]]:
+def _top_scores_snapshot(
+    scores: List[Dict[str, Any]], limit: int = 5
+) -> List[Dict[str, Any]]:
     snapshot: List[Dict[str, Any]] = []
     for item in scores[:limit]:
         snapshot.append(
@@ -2554,9 +2672,13 @@ def _build_ai_match_payload(
             "home": _team_snapshot(home_strength, home_team),
             "away": _team_snapshot(away_strength, away_team),
         },
-        "probabilities_pct": _probability_pct_map(projection_probs, ("home", "draw", "away")),
+        "probabilities_pct": _probability_pct_map(
+            projection_probs, ("home", "draw", "away")
+        ),
         "market_probs_pct": _probability_pct_map(markets, AI_MARKET_KEYS),
-        "baseline_pct": _probability_pct_map(baseline_probs or {}, ("home", "draw", "away")),
+        "baseline_pct": _probability_pct_map(
+            baseline_probs or {}, ("home", "draw", "away")
+        ),
         "top_scores": _top_scores_snapshot(top_scores),
         "tips": _tip_snapshot(tips),
         "intensity": _intensity_snapshot(intensity_snapshot),
@@ -2579,12 +2701,16 @@ def _render_ai_analysis_section(
     extra_instruction: Optional[str] = None,
 ) -> None:
     ai_ready = is_openai_configured()
-    cache: Dict[str, Dict[str, Any]] = st.session_state.setdefault("ai_analysis_cache", {})
+    cache: Dict[str, Dict[str, Any]] = st.session_state.setdefault(
+        "ai_analysis_cache", {}
+    )
     cache_entry = cache.get(str(fixture_id))
     if cache_entry:
         st.caption(f"Dernière réponse IA : {cache_entry['generated_at']}")
         st.markdown(cache_entry["content"])
-    button_label = "Demander l'avis de l'IA" if not cache_entry else "Rafraîchir l'avis de l'IA"
+    button_label = (
+        "Demander l'avis de l'IA" if not cache_entry else "Rafraîchir l'avis de l'IA"
+    )
     if st.button(button_label, key=f"ai_run_{fixture_id}", disabled=not ai_ready):
         with st.spinner("Consultation OpenAI..."):
             try:
@@ -2598,7 +2724,10 @@ def _render_ai_analysis_section(
             else:
                 generated_at_dt = datetime.now(PARIS_TZ)
                 timestamp_display = generated_at_dt.strftime("%d/%m %H:%M")
-                cache[str(fixture_id)] = {"content": analysis, "generated_at": timestamp_display}
+                cache[str(fixture_id)] = {
+                    "content": analysis,
+                    "generated_at": timestamp_display,
+                }
                 st.session_state["ai_analysis_cache"] = cache
                 st.success("Analyse IA actualisée.")
                 st.markdown(analysis)
@@ -2636,6 +2765,7 @@ def _commentator_instruction(
         label = intensity_snapshot.get("label")
         if score_val is not None and label:
             hints.append(f"Indice intensite {score_val}/100 ({label})")
+
     def _fmt_pair(home_key: str, away_key: str, label: str) -> Optional[str]:
         if not pressure:
             return None
@@ -2651,6 +2781,7 @@ def _commentator_instruction(
         except AttributeError:
             pass
         return f"{label} {home_val}-{away_val}"
+
     stats_parts: list[str] = []
     for home_key, away_key, label in [
         ("shots_on_target_home", "shots_on_target_away", "Tirs cadres"),
@@ -2667,6 +2798,7 @@ def _commentator_instruction(
                 stats_parts.append(f"xG {float(xg_home):.2f}-{float(xg_away):.2f}")
             except (TypeError, ValueError):
                 pass
+
         def _format_possession(raw: Any) -> Optional[str]:
             try:
                 value = float(raw)
@@ -2675,6 +2807,7 @@ def _commentator_instruction(
             if value <= 1.0:
                 value *= 100.0
             return f"{int(round(value))}%"
+
         poss_home = _format_possession(pressure.get("ball_possession_home"))
         poss_away = _format_possession(pressure.get("ball_possession_away"))
         if poss_home and poss_away:
@@ -2698,19 +2831,31 @@ def _render_ai_commentator_section(
     extra_instruction: Optional[str] = None,
 ) -> None:
     ai_ready = is_openai_configured()
-    cache: Dict[str, Dict[str, Any]] = st.session_state.setdefault("ai_commentary_cache", {})
+    cache: Dict[str, Dict[str, Any]] = st.session_state.setdefault(
+        "ai_commentary_cache", {}
+    )
     cache_entry = cache.get(str(fixture_id))
     if cache_entry:
         st.caption(f"Dernier commentaire IA : {cache_entry['generated_at']}")
         st.markdown(cache_entry["content"])
-    button_label = "Lancer le commentaire TV" if not cache_entry else "Actualiser le commentaire TV"
-    if st.button(button_label, key=f"ai_commentary_{fixture_id}", disabled=not ai_ready):
+    button_label = (
+        "Lancer le commentaire TV"
+        if not cache_entry
+        else "Actualiser le commentaire TV"
+    )
+    if st.button(
+        button_label, key=f"ai_commentary_{fixture_id}", disabled=not ai_ready
+    ):
         with st.spinner("Commentateur IA en cours..."):
             try:
-                instruction = _commentator_instruction(status, pressure_metrics, intensity_snapshot, context)
+                instruction = _commentator_instruction(
+                    status, pressure_metrics, intensity_snapshot, context
+                )
                 custom_note = (extra_instruction or "").strip()
                 if custom_note:
-                    instruction = " | ".join(part for part in [instruction, custom_note] if part)
+                    instruction = " | ".join(
+                        part for part in [instruction, custom_note] if part
+                    )
                 commentary = commentate_match_with_ai(
                     payload,
                     instruction=instruction or None,
@@ -2720,7 +2865,10 @@ def _render_ai_commentator_section(
             else:
                 generated_at_dt = datetime.now(PARIS_TZ)
                 timestamp_display = generated_at_dt.strftime("%d/%m %H:%M")
-                cache[str(fixture_id)] = {"content": commentary, "generated_at": timestamp_display}
+                cache[str(fixture_id)] = {
+                    "content": commentary,
+                    "generated_at": timestamp_display,
+                }
                 st.session_state["ai_commentary_cache"] = cache
                 st.success("Commentaire TV actualise.")
                 st.markdown(commentary)
@@ -2755,7 +2903,9 @@ def _render_ai_scenarios_section(
         key=f"scenario_select_{fixture_id}",
     )
     ai_ready = is_openai_configured()
-    scenario_store: Dict[str, Dict[str, Any]] = st.session_state.setdefault("ai_scenarios_cache", {})
+    scenario_store: Dict[str, Dict[str, Any]] = st.session_state.setdefault(
+        "ai_scenarios_cache", {}
+    )
     fixture_cache: Dict[str, Any] = scenario_store.setdefault(str(fixture_id), {})
     pressure_score = _pressure_score_value(pressure_metrics)
     intensity_score = None
@@ -2777,7 +2927,9 @@ def _render_ai_scenarios_section(
                 scenario_payload = build_scenario_payload(payload, key)
                 instruction = scenario_instruction(payload, key)
                 try:
-                    analysis = analyse_match_with_ai(scenario_payload, instruction=instruction)
+                    analysis = analyse_match_with_ai(
+                        scenario_payload, instruction=instruction
+                    )
                 except (AIAnalysisError, RuntimeError) as exc:
                     st.error(f"{config['label']} : {exc}")
                     continue
@@ -2884,8 +3036,15 @@ def _render_alt_projection_section(
         alt_val = float(alt_probs.get(prob_key, 0.0)) * 100.0
         delta_val = float(delta.get(prob_key, 0.0)) * 100.0
         max_delta = max(max_delta, abs(delta_val))
-        cols[idx].metric(label, f"{alt_val:.1f}% (alt)", f"{delta_val:+.1f} pts", help=f"Modèle principal : {base_val:.1f}%")
-    cache_store: Dict[str, Any] = st.session_state.setdefault("alt_projection_cache", {})
+        cols[idx].metric(
+            label,
+            f"{alt_val:.1f}% (alt)",
+            f"{delta_val:+.1f} pts",
+            help=f"Modèle principal : {base_val:.1f}%",
+        )
+    cache_store: Dict[str, Any] = st.session_state.setdefault(
+        "alt_projection_cache", {}
+    )
     cache_key = str(fixture_id)
     signature = {"alt": alt_probs, "delta": delta}
     if cache_store.get(cache_key) != signature:
@@ -2932,9 +3091,13 @@ def _build_share_context(
     top_tip = tips[0] if tips else {}
     tip_detail = tip_meta.get(top_tip.get("label", ""), {})
     edge_value = tip_detail.get("edge")
-    edge_label = f"{edge_value * 100:.1f}%" if isinstance(edge_value, (int, float)) else "N/A"
+    edge_label = (
+        f"{edge_value * 100:.1f}%" if isinstance(edge_value, (int, float)) else "N/A"
+    )
     intensity_score = intensity_snapshot.get("score")
-    bankroll_label = f"{bankroll_settings.amount:.2f} EUR / strat {bankroll_settings.strategy}"
+    bankroll_label = (
+        f"{bankroll_settings.amount:.2f} EUR / strat {bankroll_settings.strategy}"
+    )
     probs_pct = {
         "home": f"{projection_probs.get('home', 0.0) * 100:.1f}%",
         "draw": f"{projection_probs.get('draw', 0.0) * 100:.1f}%",
@@ -2957,14 +3120,16 @@ def _build_share_context(
         "prob_draw_pct": probs_pct["draw"],
         "prob_away_pct": probs_pct["away"],
         "prob_over": markets.get("over_2_5"),
-        "top_tip": {
-            "label": top_tip.get("label"),
-            "probability": top_tip.get("probability"),
-            "confidence": top_tip.get("confidence"),
-            "reason": top_tip.get("reason"),
-        }
-        if top_tip
-        else {},
+        "top_tip": (
+            {
+                "label": top_tip.get("label"),
+                "probability": top_tip.get("probability"),
+                "confidence": top_tip.get("confidence"),
+                "reason": top_tip.get("reason"),
+            }
+            if top_tip
+            else {}
+        ),
         "edge_label": edge_label,
         "edge_value": edge_label,
         "intensity_score": intensity_score,
@@ -3017,25 +3182,35 @@ def _render_engagement_panel(fixture_id: int, share_context: Dict[str, Any]) -> 
         )
         return
     col_email, col_webhook, col_tg, col_x = st.columns(4)
-    if col_email.button("Email", key=f"share_email_{fixture_id}", disabled=not availability["email"]):
+    if col_email.button(
+        "Email", key=f"share_email_{fixture_id}", disabled=not availability["email"]
+    ):
         ok, err = service.send_email(subject_value, body_value)
         if ok:
             st.success("Email envoyé.")
         else:
             st.error(f"Echec email : {err}")
-    if col_webhook.button("Webhook social", key=f"share_webhook_{fixture_id}", disabled=not availability["webhook"]):
+    if col_webhook.button(
+        "Webhook social",
+        key=f"share_webhook_{fixture_id}",
+        disabled=not availability["webhook"],
+    ):
         ok, err = service.post_webhook(body_value)
         if ok:
             st.success("Publication webhook envoyée.")
         else:
             st.error(f"Echec webhook : {err}")
-    if col_tg.button("Telegram", key=f"share_tg_{fixture_id}", disabled=not availability["telegram"]):
+    if col_tg.button(
+        "Telegram", key=f"share_tg_{fixture_id}", disabled=not availability["telegram"]
+    ):
         ok, err = service.post_telegram(body_value)
         if ok:
             st.success("Message Telegram envoyé.")
         else:
             st.error(f"Echec Telegram : {err}")
-    if col_x.button("X (Twitter)", key=f"share_x_{fixture_id}", disabled=not availability["x"]):
+    if col_x.button(
+        "X (Twitter)", key=f"share_x_{fixture_id}", disabled=not availability["x"]
+    ):
         ok, err = service.post_x(body_value)
         if ok:
             st.success("Publication X envoyée.")
@@ -3055,10 +3230,18 @@ def show_predictions(
     if scene_defaults_config:
         _seed_scene_state(scene_defaults_config)
     selected_scene_entry: Optional[Dict[str, Any]] = None
-    scene_actions = {"save_new": False, "update": False, "name": "", "target_id": None, "target_label": ""}
+    scene_actions = {
+        "save_new": False,
+        "update": False,
+        "name": "",
+        "target_id": None,
+        "target_label": "",
+    }
 
     with st.expander("Scenes sauvegardees", expanded=False):
-        scene_choices = [{"id": "", "name": "Aucune scene", "config": {}}] + saved_scenes
+        scene_choices = [
+            {"id": "", "name": "Aucune scene", "config": {}}
+        ] + saved_scenes
         selected_scene_entry = st.selectbox(
             "Scenes disponibles",
             options=scene_choices,
@@ -3067,22 +3250,30 @@ def show_predictions(
             key="predictions_scene_select",
         )
         effective_scene = (
-            selected_scene_entry if selected_scene_entry and selected_scene_entry.get("id") else None
+            selected_scene_entry
+            if selected_scene_entry and selected_scene_entry.get("id")
+            else None
         )
         col_apply, col_delete = st.columns(2)
-        if col_apply.button(
-            "Appliquer cette scene",
-            key="predictions_scene_apply_btn",
-            disabled=effective_scene is None,
-        ) and effective_scene:
+        if (
+            col_apply.button(
+                "Appliquer cette scene",
+                key="predictions_scene_apply_btn",
+                disabled=effective_scene is None,
+            )
+            and effective_scene
+        ):
             st.session_state["_predictions_scene_to_apply"] = effective_scene["config"]
             st.success(f"Scene '{effective_scene['name']}' appliquee.")
             st.experimental_rerun()
-        if col_delete.button(
-            "Supprimer cette scene",
-            key="predictions_scene_delete_btn",
-            disabled=effective_scene is None,
-        ) and effective_scene:
+        if (
+            col_delete.button(
+                "Supprimer cette scene",
+                key="predictions_scene_delete_btn",
+                disabled=effective_scene is None,
+            )
+            and effective_scene
+        ):
             delete_scene(effective_scene["id"])
             st.success(f"Scene '{effective_scene['name']}' supprimee.")
             st.experimental_rerun()
@@ -3092,7 +3283,9 @@ def show_predictions(
             key="predictions_scene_name_input",
             placeholder="Ex : Ligue 1 value bets",
         ).strip()
-        save_new_btn = st.button("Sauvegarder comme nouvelle scene", key="predictions_scene_save_btn")
+        save_new_btn = st.button(
+            "Sauvegarder comme nouvelle scene", key="predictions_scene_save_btn"
+        )
         update_btn = st.button(
             "Mettre a jour la scene selectionnee",
             key="predictions_scene_update_btn",
@@ -3110,7 +3303,9 @@ def show_predictions(
         removed = normalize_prediction_history()
         st.session_state["_prediction_history_normalized"] = True
         if removed:
-            st.caption(f"Historique prediction nettoye : {removed} doublon(s) supprime(s).")
+            st.caption(
+                f"Historique prediction nettoye : {removed} doublon(s) supprime(s)."
+            )
 
     render_cache_controls(st.sidebar, key_prefix="predictions_")
     st.sidebar.markdown("---")
@@ -3138,25 +3333,44 @@ def show_predictions(
 
     col_scope, col_limit = st.columns([1, 1])
     with col_scope:
-        scope = st.selectbox("Selection des matchs", ["A venir", "En cours", "Joues"], index=0)
+        scope = st.selectbox(
+            "Selection des matchs", ["A venir", "En cours", "Joues"], index=0
+        )
     with col_limit:
-        limit = st.slider("Nombre de matchs", min_value=5, max_value=60, value=30, step=1)
+        limit = st.slider(
+            "Nombre de matchs", min_value=5, max_value=60, value=30, step=1
+        )
 
     over_under_filters: Dict[str, Any] = {
         "over": {"enabled": False, "thresholds": {}},
-        "under": {"enabled": False, "min_prob": None, "limit_intensity": False, "max_intensity": 65},
+        "under": {
+            "enabled": False,
+            "min_prob": None,
+            "limit_intensity": False,
+            "max_intensity": 65,
+        },
     }
     with st.expander("Filtres Over/Under (optionnel)", expanded=False):
-        over_enabled = st.checkbox("Activer les filtres Over", key="over_filters_enabled")
+        over_enabled = st.checkbox(
+            "Activer les filtres Over", key="over_filters_enabled"
+        )
         over_under_filters["over"]["enabled"] = over_enabled
         if over_enabled:
             over_cols = st.columns(3)
             over_under_filters["over"]["thresholds"] = {
-                "over_1_5": over_cols[0].slider("Proba min. Over 1.5 (%)", 0, 100, 55, step=5),
-                "over_2_5": over_cols[1].slider("Proba min. Over 2.5 (%)", 0, 100, 60, step=5),
-                "over_3_5": over_cols[2].slider("Proba min. Over 3.5 (%)", 0, 100, 45, step=5),
+                "over_1_5": over_cols[0].slider(
+                    "Proba min. Over 1.5 (%)", 0, 100, 55, step=5
+                ),
+                "over_2_5": over_cols[1].slider(
+                    "Proba min. Over 2.5 (%)", 0, 100, 60, step=5
+                ),
+                "over_3_5": over_cols[2].slider(
+                    "Proba min. Over 3.5 (%)", 0, 100, 45, step=5
+                ),
             }
-        under_enabled = st.checkbox("Activer les filtres Under", key="under_filters_enabled")
+        under_enabled = st.checkbox(
+            "Activer les filtres Under", key="under_filters_enabled"
+        )
         min_under_prob = None
         limit_intensity = False
         intensity_cap = 65
@@ -3203,7 +3417,9 @@ def show_predictions(
         if not target_id:
             st.warning("Selectionnez une scene a mettre a jour.")
         else:
-            target_name = scene_actions["name"] or scene_actions.get("target_label") or "Scene"
+            target_name = (
+                scene_actions["name"] or scene_actions.get("target_label") or "Scene"
+            )
             upsert_scene(target_name, current_scene_config, scene_id=target_id)
             st.success(f"Scene '{target_name}' mise a jour.")
             st.experimental_rerun()
@@ -3240,14 +3456,17 @@ def show_predictions(
 
     try:
         with st.spinner("Chargement des matchs..."):
-            fixtures = get_fixtures(
-                league_id=league_id,
-                season=season,
-                team_id=team_id,
-                next_n=next_n,
-                last_n=last_n,
-                live=live_param,
-            ) or []
+            fixtures = (
+                get_fixtures(
+                    league_id=league_id,
+                    season=season,
+                    team_id=team_id,
+                    next_n=next_n,
+                    last_n=last_n,
+                    live=live_param,
+                )
+                or []
+            )
     except Exception as exc:
         st.error(f"Impossible d'interroger l'API : {exc}")
         return
@@ -3280,7 +3499,11 @@ def show_predictions(
         away_block = teams_block.get("away") or {}
         date_raw = fixture_block.get("date")
         parsed_date = _parse_datetime(date_raw)
-        kickoff = parsed_date.strftime("%d/%m %H:%M") if parsed_date else str(date_raw or "")[:16].replace("T", " ")
+        kickoff = (
+            parsed_date.strftime("%d/%m %H:%M")
+            if parsed_date
+            else str(date_raw or "")[:16].replace("T", " ")
+        )
         status_info = _status_details(item)
         match_rows.append(
             {
@@ -3302,20 +3525,42 @@ def show_predictions(
     if not options:
         st.warning("Aucun match exploitable apres filtrage.")
         return
-    preferred_fixture = st.session_state.pop("preferred_fixture_id", None)
-    default_index = 0
-    if preferred_fixture is not None:
-        preferred_str = str(preferred_fixture)
-        for idx, item in enumerate(options):
-            if preferred_str == str(item.get("id")):
-                default_index = idx
-                break
-    selected = st.selectbox(
-        "Choisir un match",
-        options=options,
-        index=default_index,
-        format_func=lambda item: item["label"],
-    )
+
+    # SECTION: RECOMMANDATIONS INTELLIGENTES
+    st.markdown("---")
+    with st.expander(
+        "🤖 **RECOMMANDATIONS INTELLIGENTES** (Sélection Auto par ML)", expanded=True
+    ):
+        recommended_match = render_smart_recommendations_ui(
+            fixtures, key_prefix="predictions_smart_"
+        )
+
+    # Si un match est recommandé, l'utiliser
+    if recommended_match and st.session_state.get(
+        "predictions_smart_auto_select", False
+    ):
+        fixture = recommended_match
+        fixture_id_raw = recommended_match.get("fixture", {}).get("id")
+    else:
+        # SINON: Sélection manuelle traditionnelle
+        st.markdown("---")
+        st.subheader("📋 Sélection Manuelle")
+        preferred_fixture = st.session_state.pop("preferred_fixture_id", None)
+        default_index = 0
+        if preferred_fixture is not None:
+            preferred_str = str(preferred_fixture)
+            for idx, item in enumerate(options):
+                if preferred_str == str(item.get("id")):
+                    default_index = idx
+                    break
+        selected = st.selectbox(
+            "Choisir un match",
+            options=options,
+            index=default_index,
+            format_func=lambda item: item["label"],
+        )
+        fixture = selected.get("data", {})
+        fixture_id_raw = selected.get("id")
     fixture = selected.get("data", {})
     fixture_id_raw = selected.get("id")
     if not fixture or not fixture_id_raw:
@@ -3332,7 +3577,9 @@ def show_predictions(
     previous_fetch = st.session_state.get(fetch_key)
     previous_meta = st.session_state.get(fetch_meta_key, {})
     with st.spinner("Synchronisation des statistiques live..."):
-        fixture, stats_updated_at, fetch_source = _load_fixture_with_details(fixture_id, fixture)
+        fixture, stats_updated_at, fetch_source = _load_fixture_with_details(
+            fixture_id, fixture
+        )
     now_ts = datetime.now(PARIS_TZ)
     st.session_state[fetch_key] = now_ts
     st.session_state[fetch_meta_key] = {
@@ -3345,17 +3592,25 @@ def show_predictions(
     else:
         st.caption("Statistiques fraichement chargees.")
     if stats_updated_at:
-        st.caption(f"Dernieres donnees live enregistrees : {stats_updated_at.strftime('%d/%m %H:%M:%S')} (heure Paris).")
+        st.caption(
+            f"Dernieres donnees live enregistrees : {stats_updated_at.strftime('%d/%m %H:%M:%S')} (heure Paris)."
+        )
         drift_seconds = max(0.0, (now_ts - stats_updated_at).total_seconds())
         if drift_seconds >= 1.0:
-            st.caption(f"Decalage entre API et affichage : {_format_delta(drift_seconds)}.")
+            st.caption(
+                f"Decalage entre API et affichage : {_format_delta(drift_seconds)}."
+            )
     elif fetch_source != "api":
         st.caption("Statistiques live indisponibles : affichage depuis le cache.")
     offline_flag = is_offline_mode()
     if offline_flag:
-        st.warning("Mode hors ligne : les donnees proviennent du cache. Rafraichissez une fois la connexion retablie.")
+        st.warning(
+            "Mode hors ligne : les donnees proviennent du cache. Rafraichissez une fois la connexion retablie."
+        )
     elif fetch_source in {"cache", "fallback"}:
-        st.info("Stats recuperees depuis le cache API. Passer en ligne pour actualiser.")
+        st.info(
+            "Stats recuperees depuis le cache API. Passer en ligne pour actualiser."
+        )
     elif fetch_source == "error":
         st.warning("Impossible de rafraichir les statistiques live (erreur API).")
     if weather.is_available():
@@ -3432,8 +3687,16 @@ def show_predictions(
     baseline_probs = _api_probability_snapshot(fixture_id)
 
     markov_meta = {
-        "red_cards_home": sum(1 for note in context.red_cards if str(home_team.get("name", "")).lower() in note.lower()),
-        "red_cards_away": sum(1 for note in context.red_cards if str(away_team.get("name", "")).lower() in note.lower()),
+        "red_cards_home": sum(
+            1
+            for note in context.red_cards
+            if str(home_team.get("name", "")).lower() in note.lower()
+        ),
+        "red_cards_away": sum(
+            1
+            for note in context.red_cards
+            if str(away_team.get("name", "")).lower() in note.lower()
+        ),
     }
 
     projection = project_match_outcome(
@@ -3478,11 +3741,17 @@ def show_predictions(
         "elo_home": getattr(home_strength, "elo_rating", 0.0),
         "elo_away": getattr(away_strength, "elo_rating", 0.0),
         "delta_elo": getattr(home_strength, "delta_elo", 0.0),
-        "pressure_score": float(pressure_metrics.get("score", 0.0) if pressure_metrics else 0.0),
+        "pressure_score": float(
+            pressure_metrics.get("score", 0.0) if pressure_metrics else 0.0
+        ),
         "intensity_score": float(intensity_snapshot.get("score", 0.0)),
     }
-    projection_probs = calibrate_match_probabilities(projection_probs, markets, meta=calibration_meta)
-    markets.update({key: projection_probs.get(key, 0.0) for key in ("home", "draw", "away")})
+    projection_probs = calibrate_match_probabilities(
+        projection_probs, markets, meta=calibration_meta
+    )
+    markets.update(
+        {key: projection_probs.get(key, 0.0) for key in ("home", "draw", "away")}
+    )
     intervals = probability_confidence_interval(
         home_strength,
         away_strength,
@@ -3509,7 +3778,9 @@ def show_predictions(
             live_val = live_prob * 100.0
             base_val = baseline_probs.get(key, 0.0) * 100.0
             delta_val = live_val - base_val
-            interval = intervals.get(key, (max(0.0, live_prob - 0.05), min(1.0, live_prob + 0.05)))
+            interval = intervals.get(
+                key, (max(0.0, live_prob - 0.05), min(1.0, live_prob + 0.05))
+            )
             low_pct = interval[0] * 100.0
             high_pct = interval[1] * 100.0
             display_value = f"{live_val:.1f}% (IC 95% : {low_pct:.0f}-{high_pct:.0f}%)"
@@ -3523,8 +3794,14 @@ def show_predictions(
     bankroll_settings = BankrollSettings.from_dict(get_bankroll_settings())
     alert_settings = get_alert_settings()
     ai_preferences = get_ai_preferences()
-    strategy_label = STRATEGY_LABELS.get(bankroll_settings.strategy, bankroll_settings.strategy)
-    profile_label = bankroll_settings.profile_name or bankroll_settings.profile_id or "Profil principal"
+    strategy_label = STRATEGY_LABELS.get(
+        bankroll_settings.strategy, bankroll_settings.strategy
+    )
+    profile_label = (
+        bankroll_settings.profile_name
+        or bankroll_settings.profile_id
+        or "Profil principal"
+    )
     bankroll_caption = (
         f"Bankroll disponible : {bankroll_settings.amount:.2f} EUR - strategie {strategy_label} "
         f"(profil {profile_label})"
@@ -3546,17 +3823,19 @@ def show_predictions(
         st.warning("Ce match ne respecte pas vos filtres Over/Under.")
         for msg in filter_messages:
             st.write(f"- {msg}")
-        st.info("Choisissez un autre match ou assouplissez vos seuils dans l'encart de filtres.")
+        st.info(
+            "Choisissez un autre match ou assouplissez vos seuils dans l'encart de filtres."
+        )
         return
 
     try:
         bias_summary = over_under_bias(window=250)
     except Exception:
-        bias_summary = {'bias': 0.0, 'sample': 0, 'predicted': None, 'actual': None}
+        bias_summary = {"bias": 0.0, "sample": 0, "predicted": None, "actual": None}
     over_bias_value = 0.0
-    if isinstance(bias_summary, dict) and (bias_summary.get('sample', 0) or 0) >= 25:
+    if isinstance(bias_summary, dict) and (bias_summary.get("sample", 0) or 0) >= 25:
         try:
-            over_bias_value = float(bias_summary.get('bias') or 0.0)
+            over_bias_value = float(bias_summary.get("bias") or 0.0)
         except (TypeError, ValueError):
             over_bias_value = 0.0
 
@@ -3588,7 +3867,9 @@ def show_predictions(
     )
     if highlight_rows:
         st.subheader("Belles cotes à saisir")
-        st.caption(f"Edges >= {highlight_threshold_pts} pts selon le modèle vs la cote disponible.")
+        st.caption(
+            f"Edges >= {highlight_threshold_pts} pts selon le modèle vs la cote disponible."
+        )
         table_data: List[Dict[str, Any]] = []
         for row in highlight_rows:
             odd_value = float(row.get("odd") or bankroll_settings.default_odds)
@@ -3603,7 +3884,9 @@ def show_predictions(
                     "Confiance": f"{confidence}/100" if confidence else "-",
                 }
             )
-        st.dataframe(pd.DataFrame(table_data), hide_index=True, use_container_width=True)
+        st.dataframe(
+            pd.DataFrame(table_data), hide_index=True, use_container_width=True
+        )
         for row in highlight_rows:
             reason = row.get("reason")
             if reason:
@@ -3634,10 +3917,19 @@ def show_predictions(
                 f"Niveau : {pressure_metrics['label']} | Score {pressure_metrics['score'] * 100:.0f}/100"
             )
             pressure_cols = st.columns(4)
-            pressure_cols[0].metric("Tirs cadres", str(pressure_metrics.get("shots_on_target", 0)))
-            pressure_cols[1].metric("Tirs totaux", str(pressure_metrics.get("total_shots", 0)))
-            pressure_cols[2].metric("Attaques dangereuses", str(pressure_metrics.get("dangerous_attacks", 0)))
-            pressure_cols[3].metric("xG cumules", f"{pressure_metrics.get('xg_total', 0.0):.2f}")
+            pressure_cols[0].metric(
+                "Tirs cadres", str(pressure_metrics.get("shots_on_target", 0))
+            )
+            pressure_cols[1].metric(
+                "Tirs totaux", str(pressure_metrics.get("total_shots", 0))
+            )
+            pressure_cols[2].metric(
+                "Attaques dangereuses",
+                str(pressure_metrics.get("dangerous_attacks", 0)),
+            )
+            pressure_cols[3].metric(
+                "xG cumules", f"{pressure_metrics.get('xg_total', 0.0):.2f}"
+            )
             poss_home = pressure_metrics.get("ball_possession_home")
             poss_away = pressure_metrics.get("ball_possession_away")
             passes_home = pressure_metrics.get("passes_accurate_home")
@@ -3656,6 +3948,7 @@ def show_predictions(
             shots_on_target_away = pressure_metrics.get("shots_on_target_away")
             total_shots_home = pressure_metrics.get("total_shots_home")
             total_shots_away = pressure_metrics.get("total_shots_away")
+
             def _fmt_int(value: Any) -> str:
                 if value in (None, "", "-"):
                     return "-"
@@ -3666,10 +3959,12 @@ def show_predictions(
                 if abs(num - int(num)) < 1e-6:
                     return str(int(num))
                 return f"{num:.1f}"
+
             def _fmt_pct(value: Optional[float]) -> str:
                 if value is None:
                     return "-"
                 return f"{value * 100:.0f}%"
+
             per_team_lines = []
             per_team_lines.append(
                 f"{home_name} : tirs cadrÃ©s {_fmt_int(shots_on_target_home)} | tirs {_fmt_int(total_shots_home)} | xG {xg_home:.2f} | "
@@ -3688,7 +3983,9 @@ def show_predictions(
             for line in per_team_lines:
                 st.caption(line)
             if pressure_metrics.get("recent_events"):
-                st.caption(f"{pressure_metrics['recent_events']} actions chaudes dans les 10 dernieres minutes.")
+                st.caption(
+                    f"{pressure_metrics['recent_events']} actions chaudes dans les 10 dernieres minutes."
+                )
             last_event_min = pressure_metrics.get("last_event_elapsed")
             if last_event_min is not None:
                 st.caption(f"Derniere action enregistree : {int(last_event_min)}'.")
@@ -3711,7 +4008,9 @@ def show_predictions(
     else:
         st.caption("Statistiques live non disponibles pour ce match.")
 
-    history_store: Dict[str, List[Dict[str, Any]]] = st.session_state.setdefault("intensity_history", {})
+    history_store: Dict[str, List[Dict[str, Any]]] = st.session_state.setdefault(
+        "intensity_history", {}
+    )
     fixture_key = str(fixture_id)
     now_ts = datetime.now(PARIS_TZ)
     current_entry = {"timestamp": now_ts.isoformat(), "score": intensity["score"]}
@@ -3727,26 +4026,34 @@ def show_predictions(
         except Exception:
             continue
         if timestamp >= cutoff:
-            filtered_history.append({"timestamp": timestamp.isoformat(), "score": item.get("score", 0)})
+            filtered_history.append(
+                {"timestamp": timestamp.isoformat(), "score": item.get("score", 0)}
+            )
     history_store[fixture_key] = filtered_history[-60:]
     st.session_state["intensity_history"] = history_store
     if status["short"] in LIVE_STATUS_CODES:
         if len(filtered_history) >= 2:
             history_df = pd.DataFrame(filtered_history)
-            history_df["timestamp"] = pd.to_datetime(history_df["timestamp"], errors="coerce")
+            history_df["timestamp"] = pd.to_datetime(
+                history_df["timestamp"], errors="coerce"
+            )
             history_df.dropna(subset=["timestamp"], inplace=True)
             history_df.sort_values("timestamp", inplace=True)
             if not history_df.empty:
                 st.caption("Evolution de l'indice (30 dernieres minutes)")
                 st.line_chart(history_df.set_index("timestamp")["score"])
         else:
-            st.caption("Historique en cours de collecte, recharger la page pour suivre la courbe.")
+            st.caption(
+                "Historique en cours de collecte, recharger la page pour suivre la courbe."
+            )
 
     cache_info = cache_stats()
     offline_flag = is_offline_mode() or cache_info.get("offline", False)
     cache_expired = cache_info.get("expired", 0)
     cache_hits = cache_info.get("hits", 0)
-    if offline_flag or (status["short"] in LIVE_STATUS_CODES and cache_expired > cache_hits):
+    if offline_flag or (
+        status["short"] in LIVE_STATUS_CODES and cache_expired > cache_hits
+    ):
         st.warning(
             "Mode degrade detecte : les donnees peuvent dater du cache (offline ou quota atteint). "
             "Verifier les horodatages avant d'agir.",
@@ -3754,7 +4061,9 @@ def show_predictions(
         )
 
     st.subheader("Resume match")
-    for line in _match_summary_lines(fixture, home_strength, away_strength, status, context=context):
+    for line in _match_summary_lines(
+        fixture, home_strength, away_strength, status, context=context
+    ):
         st.markdown(line)
 
     st.subheader("Probabilites 1X2")
@@ -3771,7 +4080,9 @@ def show_predictions(
     bet_table_rows: List[Dict[str, Any]] = []
     if tips:
         with st.expander("Recommandations de mise", expanded=True):
-            default_tip_odd = _odds_for_tip(tips[0], odds_map, home_name, away_name) if tips else None
+            default_tip_odd = (
+                _odds_for_tip(tips[0], odds_map, home_name, away_name) if tips else None
+            )
             fallback_odd = default_tip_odd or bankroll_settings.default_odds
             odds_input_value = st.number_input(
                 "Cote disponible",
@@ -3782,9 +4093,16 @@ def show_predictions(
             display_tips = tips[:8]
             table_rows = []
             for tip in display_tips:
-                tip_odd = _odds_for_tip(tip, odds_map, home_name, away_name) or odds_input_value
-                suggestion = suggest_stake(tip["probability"], tip_odd, bankroll_settings)
-                entry = _store_tip_meta(tip_meta, tip["label"], tip_odd, suggestion, bankroll_settings)
+                tip_odd = (
+                    _odds_for_tip(tip, odds_map, home_name, away_name)
+                    or odds_input_value
+                )
+                suggestion = suggest_stake(
+                    tip["probability"], tip_odd, bankroll_settings
+                )
+                entry = _store_tip_meta(
+                    tip_meta, tip["label"], tip_odd, suggestion, bankroll_settings
+                )
                 comment = entry.get("comment", "")
                 table_rows.append(
                     {
@@ -3800,18 +4118,30 @@ def show_predictions(
             if table_rows:
                 main_tip = tips[0]
                 main_tip_odd = table_rows[0]["Cote"]
-                main_suggestion = suggest_stake(main_tip["probability"], main_tip_odd, bankroll_settings)
+                main_suggestion = suggest_stake(
+                    main_tip["probability"], main_tip_odd, bankroll_settings
+                )
                 col_stake, col_edge, col_profit = st.columns(3)
-                col_stake.metric("Mise recommandee", f"{main_suggestion['stake']:.2f} EUR", help=main_tip["label"])
+                col_stake.metric(
+                    "Mise recommandee",
+                    f"{main_suggestion['stake']:.2f} EUR",
+                    help=main_tip["label"],
+                )
                 col_edge.metric("Edge estime", f"{main_suggestion['edge'] * 100:.1f}%")
-                col_profit.metric("Gain attendu", f"{main_suggestion['expected_profit']:.2f} EUR")
+                col_profit.metric(
+                    "Gain attendu", f"{main_suggestion['expected_profit']:.2f} EUR"
+                )
                 main_comment = _stake_comment(main_suggestion, bankroll_settings)
                 if main_comment:
                     col_stake.caption(main_comment)
                 edge_value = float(main_suggestion.get("edge") or 0.0)
-                edge_threshold_pct = float(alert_settings.get("edge_threshold_pct", 7.5))
+                edge_threshold_pct = float(
+                    alert_settings.get("edge_threshold_pct", 7.5)
+                )
                 edge_threshold = edge_threshold_pct / 100.0
-                edge_ttl = max(120, int(alert_settings.get("edge_dedup_minutes", 45) * 60))
+                edge_ttl = max(
+                    120, int(alert_settings.get("edge_dedup_minutes", 45) * 60)
+                )
                 if edge_value >= edge_threshold:
                     edge_pct = edge_value * 100.0
                     warn_threshold = edge_threshold_pct + 3.0
@@ -3843,11 +4173,16 @@ def show_predictions(
                     else:
                         table_df["Commentaire"].replace("", pd.NA, inplace=True)
                 st.dataframe(table_df, hide_index=True, use_container_width=True)
-                st.caption("Les mises sont calculees avec la bankroll, les cotes API (si disponibles) et la valeur saisie en cas d'absence.")
+                st.caption(
+                    "Les mises sont calculees avec la bankroll, les cotes API (si disponibles) et la valeur saisie en cas d'absence."
+                )
                 if (
                     isinstance(bias_summary, dict)
                     and (bias_summary.get("sample", 0) or 0) >= 25
-                    and all(bias_summary.get(key) is not None for key in ("actual", "predicted"))
+                    and all(
+                        bias_summary.get(key) is not None
+                        for key in ("actual", "predicted")
+                    )
                 ):
                     st.caption(
                         "Calibration Over/Under : modele {:.1%} vs resultats {:.1%} ({} matchs recents).".format(
@@ -3860,21 +4195,29 @@ def show_predictions(
 
     if tips:
         with st.expander("Confirmer un pari jouÃ©", expanded=False):
-            available_labels = [row["Selection"] for row in bet_table_rows] or [tip["label"] for tip in tips[:8]]
+            available_labels = [row["Selection"] for row in bet_table_rows] or [
+                tip["label"] for tip in tips[:8]
+            ]
             if not available_labels:
                 st.info("Aucune recommandation Ã  enregistrer pour ce match.")
             else:
                 default_label = available_labels[0]
                 default_meta = tip_meta.get(default_label, {})
-                default_odd_value = float(default_meta.get("odd") or bankroll_settings.default_odds)
+                default_odd_value = float(
+                    default_meta.get("odd") or bankroll_settings.default_odds
+                )
                 default_stake_value = float(default_meta.get("stake") or 0.0)
                 form_key = f"bet_form_{fixture_id}_{status.get('short', '')}"
                 with st.form(form_key):
-                    selection = st.selectbox("SÃ©lection jouÃ©e", available_labels, index=0)
+                    selection = st.selectbox(
+                        "SÃ©lection jouÃ©e", available_labels, index=0
+                    )
                     bookmaker_value = st.text_input("Bookmaker", value="")
                     selection_meta = tip_meta.get(selection, default_meta)
                     odd_default = float(selection_meta.get("odd") or default_odd_value)
-                    stake_default = float(selection_meta.get("stake") or default_stake_value)
+                    stake_default = float(
+                        selection_meta.get("stake") or default_stake_value
+                    )
                     odd_value = st.number_input(
                         "Cote prise",
                         min_value=1.01,
@@ -3889,7 +4232,12 @@ def show_predictions(
                         step=1.0,
                         key=f"bet_stake_{form_key}",
                     )
-                    notes_value = st.text_area("Notes (optionnel)", value="", height=70, key=f"bet_notes_{form_key}")
+                    notes_value = st.text_area(
+                        "Notes (optionnel)",
+                        value="",
+                        height=70,
+                        key=f"bet_notes_{form_key}",
+                    )
                     submitted = st.form_submit_button("Enregistrer ce pari")
                 if submitted:
                     success = record_bet(
@@ -3907,7 +4255,9 @@ def show_predictions(
                         st.success("Pari enregistrÃ© dans l'historique.")
                         st.experimental_rerun()
                     else:
-                        st.error("Impossible d'enregistrer le pari (entrÃ©e introuvable).")
+                        st.error(
+                            "Impossible d'enregistrer le pari (entrÃ©e introuvable)."
+                        )
 
     cashout_advice = _cashout_recommendations(
         tips,
@@ -3922,17 +4272,26 @@ def show_predictions(
     if cashout_advice:
         st.subheader("Option cashout (live)")
         for entry in cashout_advice:
-            if entry['action'] == 'cashout':
-                st.warning(f"Cashout recommande sur **{entry['label']}** : {entry['reason']}", icon="⚠️")
+            if entry["action"] == "cashout":
+                st.warning(
+                    f"Cashout recommande sur **{entry['label']}** : {entry['reason']}",
+                    icon="⚠️",
+                )
             else:
-                st.info(f"Maintien possible sur **{entry['label']}** : {entry['reason']}")
+                st.info(
+                    f"Maintien possible sur **{entry['label']}** : {entry['reason']}"
+                )
         if alert_settings.get("cashout_alert_enabled", True):
-            cashout_ttl = max(60, int(alert_settings.get("cashout_dedup_minutes", 20) * 60))
+            cashout_ttl = max(
+                60, int(alert_settings.get("cashout_dedup_minutes", 20) * 60)
+            )
             for entry in cashout_advice:
                 if entry.get("action") != "cashout":
                     continue
                 label = entry.get("label", "Pari")
-                label_token = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_") or "bet"
+                label_token = (
+                    re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_") or "bet"
+                )
                 notify_event(
                     "Cashout critique",
                     f"{label} sur {home_name} vs {away_name} : {entry.get('reason', '')}",
@@ -3950,9 +4309,16 @@ def show_predictions(
             max_confidence = max(max_confidence, tip.get("confidence", 0))
             detail = tip_meta.get(tip["label"])
             if detail is None:
-                tip_odd = _odds_for_tip(tip, odds_map, home_name, away_name) or odds_input_value
-                suggestion = suggest_stake(tip["probability"], tip_odd, bankroll_settings)
-                detail = _store_tip_meta(tip_meta, tip["label"], tip_odd, suggestion, bankroll_settings)
+                tip_odd = (
+                    _odds_for_tip(tip, odds_map, home_name, away_name)
+                    or odds_input_value
+                )
+                suggestion = suggest_stake(
+                    tip["probability"], tip_odd, bankroll_settings
+                )
+                detail = _store_tip_meta(
+                    tip_meta, tip["label"], tip_odd, suggestion, bankroll_settings
+                )
             competitive_edges.append(detail.get("edge", 0.0))
         has_positive_edge = any(edge for edge in competitive_edges if edge and edge > 0)
         if (max_confidence < 60) or not has_positive_edge:
@@ -3986,9 +4352,16 @@ def show_predictions(
 
             detail = tip_meta.get(tip["label"])
             if detail is None:
-                tip_odd = _odds_for_tip(tip, odds_map, home_name, away_name) or odds_input_value
-                suggestion = suggest_stake(tip["probability"], tip_odd, bankroll_settings)
-                detail = _store_tip_meta(tip_meta, tip["label"], tip_odd, suggestion, bankroll_settings)
+                tip_odd = (
+                    _odds_for_tip(tip, odds_map, home_name, away_name)
+                    or odds_input_value
+                )
+                suggestion = suggest_stake(
+                    tip["probability"], tip_odd, bankroll_settings
+                )
+                detail = _store_tip_meta(
+                    tip_meta, tip["label"], tip_odd, suggestion, bankroll_settings
+                )
 
             combo_selection_key = _combo_state_key(fixture_id, tip["label"])
             combo_checked_default = combo_selection_key in _combo_cart()
@@ -4017,7 +4390,9 @@ def show_predictions(
                     "match_label": f"{home_name} vs {away_name}",
                     "league_id": league_id,
                     "season": season,
-                    "fixture_date": _format_datetime(fixture.get("fixture", {}).get("date")),
+                    "fixture_date": _format_datetime(
+                        fixture.get("fixture", {}).get("date")
+                    ),
                 }
                 _add_to_combo(combo_selection_key, selection)
             else:
@@ -4078,16 +4453,30 @@ def show_predictions(
         st.markdown("### Suivi session")
         if selected_tip_rows:
             st.markdown("**Paris recommandes**")
-            st.dataframe(pd.DataFrame(selected_tip_rows), hide_index=True, use_container_width=True)
+            st.dataframe(
+                pd.DataFrame(selected_tip_rows),
+                hide_index=True,
+                use_container_width=True,
+            )
         if score_selected_rows:
             st.markdown("**Scores joues**")
-            st.dataframe(pd.DataFrame(score_selected_rows), hide_index=True, use_container_width=True)
+            st.dataframe(
+                pd.DataFrame(score_selected_rows),
+                hide_index=True,
+                use_container_width=True,
+            )
         if scorer_selected_rows:
             st.markdown("**Buteurs joues**")
-            st.dataframe(pd.DataFrame(scorer_selected_rows), hide_index=True, use_container_width=True)
+            st.dataframe(
+                pd.DataFrame(scorer_selected_rows),
+                hide_index=True,
+                use_container_width=True,
+            )
         action_cols = st.columns([2, 1])
         with action_cols[0]:
-            confirm_disabled = not (selected_tip_rows or score_selected_rows or scorer_selected_rows)
+            confirm_disabled = not (
+                selected_tip_rows or score_selected_rows or scorer_selected_rows
+            )
             confirm_help = (
                 "Sélectionne au moins un pari, score ou buteur avant de confirmer."
                 if confirm_disabled
@@ -4104,14 +4493,22 @@ def show_predictions(
                 else:
                     bet_components: List[str] = []
                     bet_components.extend(row["Pari"] for row in selected_tip_rows)
-                    bet_components.extend(f"Score {row['Score']}" for row in score_selected_rows)
-                    bet_components.extend(f"Buteur {row['Joueur']}" for row in scorer_selected_rows)
+                    bet_components.extend(
+                        f"Score {row['Score']}" for row in score_selected_rows
+                    )
+                    bet_components.extend(
+                        f"Buteur {row['Joueur']}" for row in scorer_selected_rows
+                    )
                     bet_label = " + ".join(bet_components)
                     _log_prediction_snapshot(*snapshot_args, bet_selection=bet_label)
                     notify_event(
                         "Paris confirmés",
                         f"{bet_label} sur {home_team.get('name', 'Equipe A')} vs {away_team.get('name', 'Equipe B')}",
-                        tags=["bet", home_team.get("name", ""), away_team.get("name", "")],
+                        tags=[
+                            "bet",
+                            home_team.get("name", ""),
+                            away_team.get("name", ""),
+                        ],
                     )
                     st.success(f"Paris confirmés : {bet_label}")
         with action_cols[1]:
@@ -4128,7 +4525,9 @@ def show_predictions(
                         del st.session_state[score_key]
                 scorer_prefix = f"bet_{fixture_id}_scorer"
                 scorer_state_keys = [
-                    key for key in list(tracker.keys()) if isinstance(key, str) and key.startswith(scorer_prefix)
+                    key
+                    for key in list(tracker.keys())
+                    if isinstance(key, str) and key.startswith(scorer_prefix)
                 ]
                 for scorer_key in scorer_state_keys:
                     tracker.pop(scorer_key, None)
@@ -4137,7 +4536,9 @@ def show_predictions(
                 st.session_state["bet_tracker"] = tracker
                 st.rerun()
     else:
-        st.caption("Coche un pari, un score ou un buteur ci-dessus pour l'ajouter a ton suivi de session.")
+        st.caption(
+            "Coche un pari, un score ou un buteur ci-dessus pour l'ajouter a ton suivi de session."
+        )
 
     _render_combo_cart(bankroll_settings)
 
@@ -4145,7 +4546,9 @@ def show_predictions(
     injured_away_names: set[str] = set()
 
     with st.spinner("Analyse buteurs / blessures..."):
-        top_scorers, topscorers_fallback_season = _topscorers_best_effort(league_id, season)
+        top_scorers, topscorers_fallback_season = _topscorers_best_effort(
+            league_id, season
+        )
         players_home = _players_best_effort(league_id, season, int(home_id))
         players_away = _players_best_effort(league_id, season, int(away_id))
         injured_home_names = _injured_name_set(injuries_home)
@@ -4170,11 +4573,15 @@ def show_predictions(
             {
                 "Joueur": s["name"],
                 "Probabilite %": round(s["prob"] * 100, 1),
-                "Source": "Topscorers" if s.get("source") == "topscorers" else "Effectif",
+                "Source": (
+                    "Topscorers" if s.get("source") == "topscorers" else "Effectif"
+                ),
             }
             for s in scorers
         ]
-        st.dataframe(pd.DataFrame(scorers_table), hide_index=True, use_container_width=True)
+        st.dataframe(
+            pd.DataFrame(scorers_table), hide_index=True, use_container_width=True
+        )
         st.markdown("Selectionne les buteurs a suivre :")
         for idx, scorer in enumerate(scorers[:8], start=1):
             scorer_key = _bet_state_key(f"{fixture_id}_scorer", scorer["name"])
@@ -4192,7 +4599,11 @@ def show_predictions(
                     {
                         "Joueur": scorer["name"],
                         "Probabilite %": round(scorer["prob"] * 100, 1),
-                        "Source": "Topscorers" if scorer.get("source") == "topscorers" else "Effectif",
+                        "Source": (
+                            "Topscorers"
+                            if scorer.get("source") == "topscorers"
+                            else "Effectif"
+                        ),
                     }
                 )
         if topscorers_fallback_season and topscorers_fallback_season != season:
@@ -4247,7 +4658,9 @@ def show_predictions(
                 severity="warning",
                 tags=["context", "injury"],
                 dedup_key=f"context_{fixture_id}_{context_signature}",
-                ttl_seconds=max(900, int(alert_settings.get("edge_dedup_minutes", 45) * 60)),
+                ttl_seconds=max(
+                    900, int(alert_settings.get("edge_dedup_minutes", 45) * 60)
+                ),
             )
     if injuries_list or red_cards_list:
         alerts_parts: List[str] = []
@@ -4257,12 +4670,10 @@ def show_predictions(
             alerts_parts.append("blessures: " + ", ".join(injuries_list))
         dynamic_prompts.append(
             "Absences detectees (" + " | ".join(alerts_parts) + "). "
-            "Prompt suggere : \"Quelle strategie adopter avec ces absences et quels joueurs alternatifs surveiller ?\""
+            'Prompt suggere : "Quelle strategie adopter avec ces absences et quels joueurs alternatifs surveiller ?"'
         )
     if pressure_metrics and pressure_metrics.get("score", 0.0) >= 0.6:
-        dynamic_prompts.append(
-            "Pression offensive tres elevee, la securite prime."
-        )
+        dynamic_prompts.append("Pression offensive tres elevee, la securite prime.")
     favorites = get_favorite_competitions()
     if favorites:
         for favorite in favorites:
@@ -4274,7 +4685,7 @@ def show_predictions(
             if fav_league == int(league_id) and (fav_season in {None, season}):
                 label = favorite.get("label") or home_team.get("name") or "ton favori"
                 dynamic_prompts.append(
-                    f"Favori detecte ({label}). Prompt : \"Compare ce match avec le calendrier de {label} et identifie les risques de fatigue ou rotation.\""
+                    f'Favori detecte ({label}). Prompt : "Compare ce match avec le calendrier de {label} et identifie les risques de fatigue ou rotation."'
                 )
                 break
     if dynamic_prompts:
@@ -4364,12 +4775,20 @@ def show_predictions(
         for code, description in MARKETS_CATALOG.items():
             st.markdown(f"- **{code}** : {description}")
 
+    # Dashboard ML avec les analyses
+    with st.expander("📊 Analyse ML & Patterns de Paris", expanded=False):
+        show_ml_analysis_dashboard()
+
     st.markdown("---")
     with st.expander("Donnees API officielles", expanded=False):
         with st.spinner("Chargement des predictions API..."):
             api_predictions = get_predictions(fixture_id)
         if api_predictions:
-            entry = api_predictions[0] if isinstance(api_predictions, list) else api_predictions
+            entry = (
+                api_predictions[0]
+                if isinstance(api_predictions, list)
+                else api_predictions
+            )
             prediction = entry.get("prediction") or {}
             winner = prediction.get("winner", {}).get("name", "N/A")
             percent = prediction.get("percent") or {}
