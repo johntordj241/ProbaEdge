@@ -49,3 +49,6 @@
 {"fixture_id": 1477047, "template": "edge_alert", "timestamp": "2026-01-13T18:17:05.018013+00:00"}
 {"fixture_id": 1387854, "template": "pre_match", "timestamp": "2026-01-16T14:20:01.699735+00:00"}
 {"fixture_id": 1387854, "template": "pre_match", "timestamp": "2026-01-16T16:47:03.388523+00:00"}
+{"fixture_id": 1451128, "template": "edge_alert", "timestamp": "2026-01-20T10:23:17.374949+00:00"}
+{"fixture_id": 1451131, "template": "edge_alert", "timestamp": "2026-01-20T10:23:18.602642+00:00"}
+{"fixture_id": 1451128, "template": "pre_match", "timestamp": "2026-01-20T11:47:04.497666+00:00"}

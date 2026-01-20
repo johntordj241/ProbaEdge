@@ -25,6 +25,9 @@ from utils.odds import show_odds
 from utils.players_ui import show_players
 from utils.prediction_history import training_progress, sync_prediction_results
 from utils.predictions import show_predictions
+from utils.predictions_journalist import show_predictions_with_journalist
+from utils.discipline_center import show_discipline_center
+from utils.journalist_ai import JournalistAnalyzer
 from utils.roadmap import show_roadmap
 from utils.standings import show_standings
 from utils.statistics import show_statistics
@@ -63,6 +66,44 @@ st.set_page_config(
     page_title="Proba Edge",
     layout="wide",
     page_icon="assets/logo_proba_edge.png",
+    initial_sidebar_state="expanded",
+)
+
+# 🎨 Custom CSS pour maximiser la largeur de la page
+st.markdown(
+    """
+    <style>
+    /* Réduire les marges du main content */
+    .main {
+        max-width: 100% !important;
+        padding-right: 2rem !important;
+        padding-left: 2rem !important;
+    }
+    
+    /* Élargir le conteneur principal */
+    [data-testid="stMainBlockContainer"] {
+        max-width: 100% !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    
+    /* Élargir les colonnes */
+    .element-container {
+        max-width: 100% !important;
+    }
+    
+    /* Réduire les padding des metrics */
+    [data-testid="metric-container"] {
+        padding: 0.5rem !important;
+    }
+    
+    /* Élargir les dataframes */
+    .dataframe {
+        width: 100% !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 DEFAULT_LEAGUE_ID = 61
@@ -112,6 +153,7 @@ MENU_OPTIONS = [
     "Classement",
     "Joueurs",
     "Predictions",
+    "Discipline Center",
     "Buteurs",
     "Passeurs",
     "Cartons",
@@ -218,7 +260,9 @@ if access_granted:
     elif menu == "Joueurs":
         show_players(DEFAULT_LEAGUE_ID, DEFAULT_SEASON, DEFAULT_TEAM_ID)
     elif menu == "Predictions":
-        show_predictions(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
+        show_predictions_with_journalist(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
+    elif menu == "Discipline Center":
+        show_discipline_center()
     elif menu == "Buteurs":
         show_topscorers(DEFAULT_LEAGUE_ID, DEFAULT_SEASON)
     elif menu == "Passeurs":
