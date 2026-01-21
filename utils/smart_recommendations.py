@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 from .ml_prediction_engine import get_ml_confidence
 from .prediction_model import project_match_outcome
+from .calibration_integration import apply_calibration_to_dataframe, calibrator
 
 PARIS_TZ = ZoneInfo("Europe/Paris")
 

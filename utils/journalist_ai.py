@@ -16,7 +16,15 @@ class JournalistAnalyzer:
     """Agent IA journaliste-analyste pour contexte des matchs"""
 
     def __init__(self, df):
-        self.df = df
+        self.df = df.copy()
+        # Convertir les colonnes de dates
+        self.df["fixture_date"] = pd.to_datetime(
+            self.df["fixture_date"], utc=True, errors="coerce"
+        )
+        # Convertir les colonnes numériques
+        for col in ["prob_home", "prob_away", "prob_draw", "goals_home", "goals_away"]:
+            if col in self.df.columns:
+                self.df[col] = pd.to_numeric(self.df[col], errors="coerce")
         self.client = None
         if OPENAI_AVAILABLE and os.getenv("OPENAI_API_KEY"):
             self.client = OpenAI()
@@ -64,6 +72,13 @@ class JournalistAnalyzer:
         """Détecte les anomalies et patterns suspects"""
         alerts = []
 
+        # Convertir en float si nécessaire
+        try:
+            prob_home = float(prob_home)
+            prob_away = float(prob_away)
+        except:
+            return alerts
+
         # Anomalie 1: Probabilité déséquilibrée vs cote
         if prob_home > 0.85 and prob_away > 0.10:
             alerts.append(
@@ -87,21 +102,25 @@ class JournalistAnalyzer:
         )
 
         if len(home_recent) > 0 and len(away_recent) > 0:
-            home_wins = len(
-                home_recent[home_recent["result_winner"].isin(["home", "1"])]
-            )
-            away_wins = len(
-                away_recent[away_recent["result_winner"].isin(["away", "2"])]
-            )
-
-            if home_wins == 0 and away_wins >= 3:
-                alerts.append(
-                    {
-                        "type": "forme_contraste",
-                        "severity": "high",
-                        "message": f"🔴 {home_team} en mauvaise forme (0/5) vs {away_team} en bonne forme (3/5+)",
-                    }
+            try:
+                home_wins = len(
+                    home_recent[home_recent["result_winner"].isin(["home", "1"])]
                 )
+                away_wins = len(
+                    away_recent[away_recent["result_winner"].isin(["away", "2"])]
+                )
+
+                if home_wins == 0 and away_wins >= 3:
+                    alerts.append(
+                        {
+                            "type": "forme_contraste",
+                            "severity": "high",
+                            "message": f"🔴 {home_team} en mauvaise forme (0/5) vs {away_team} en bonne forme (3/5+)",
+                        }
+                    )
+            except Exception as e:
+                # Ignorer les erreurs de comparaison
+                pass
 
         return alerts
 

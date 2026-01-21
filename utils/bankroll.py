@@ -47,7 +47,10 @@ class BankrollSettings:
             min_stake=float(max(0.0, source.get("min_stake", 0.0))),
             max_stake=float(max(0.0, source.get("max_stake", 0.0))),
             profile_id=str(source.get("profile_id") or source.get("id") or "") or None,
-            profile_name=str(source.get("profile_name") or source.get("name") or "").strip() or None,
+            profile_name=str(
+                source.get("profile_name") or source.get("name") or ""
+            ).strip()
+            or None,
         )
 
 
@@ -62,7 +65,9 @@ def _clamp_stake(stake: float, settings: BankrollSettings) -> float:
     return stake
 
 
-def suggest_stake(probability: float, odds: Optional[float], settings: BankrollSettings) -> Dict[str, float]:
+def suggest_stake(
+    probability: float, odds: Optional[float], settings: BankrollSettings
+) -> Dict[str, float]:
     prob = max(0.0, min(1.0, float(probability or 0.0)))
     if odds is None or odds <= 1.0:
         odds = settings.default_odds
@@ -104,6 +109,10 @@ def suggest_stake(probability: float, odds: Optional[float], settings: BankrollS
     else:
         stake = settings.amount * (settings.percent / 100.0)
 
+    # ⚠️ BANKROLL CAP: Never risk more than 3% per bet
+    max_bankroll_stake = settings.amount * 0.03
+    stake = min(stake, max_bankroll_stake)
+
     stake = _clamp_stake(stake, settings)
     if stake <= 0:
         return {
@@ -119,7 +128,9 @@ def suggest_stake(probability: float, odds: Optional[float], settings: BankrollS
         status = "capped_max"
     elif math.isclose(stake, settings.amount, rel_tol=1e-6):
         status = "all_bankroll"
-    elif settings.min_stake > 0 and math.isclose(stake, settings.min_stake, rel_tol=1e-6):
+    elif settings.min_stake > 0 and math.isclose(
+        stake, settings.min_stake, rel_tol=1e-6
+    ):
         status = "min_enforced"
 
     expected_profit = stake * edge
