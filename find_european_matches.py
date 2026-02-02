@@ -12,11 +12,8 @@ df = df.dropna(subset=["fixture_date"])
 df["date_str"] = df["fixture_date"].dt.strftime("%Y-%m-%d")
 
 # Filtrer LDC (3) et Europa (4) - Matchs futurs SEULEMENT
-today = pd.Timestamp("2026-01-19", tz='UTC')
-european = df[
-    (df["league_id"].isin([3.0, 4.0])) &
-    (df["fixture_date"] >= today)
-].copy()
+today = pd.Timestamp("2026-01-19", tz="UTC")
+european = df[(df["league_id"].isin([3.0, 4.0])) & (df["fixture_date"] >= today)].copy()
 
 european = european.drop_duplicates(subset=["fixture_id"]).sort_values("fixture_date")
 
@@ -30,7 +27,7 @@ if len(european) > 0:
     current_date = None
     for idx, row in european.iterrows():
         row_date = row["fixture_date"].strftime("%d/%m/%Y")
-        
+
         # Afficher un séparateur de date si elle change
         if row_date != current_date:
             if current_date is not None:
@@ -38,7 +35,7 @@ if len(european) > 0:
             print(f"\n📅 {row_date}")
             print("-" * 100)
             current_date = row_date
-        
+
         league_name = league_names.get(row["league_id"], "?")
         time = row["fixture_date"].strftime("%H:%M")
 
@@ -58,4 +55,3 @@ else:
     print(f"Plage des données: {unique_dates[0]} → {unique_dates[-1]}")
     ldc_europa = df[df["league_id"].isin([3.0, 4.0])]["date_str"].unique()
     print(f"Matchs LDC/Europa disponibles aux dates: {sorted(ldc_europa)}")
-        print(f"  {d}: {count} matchs")

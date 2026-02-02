@@ -109,9 +109,12 @@ def suggest_stake(
     else:
         stake = settings.amount * (settings.percent / 100.0)
 
-    # ⚠️ BANKROLL CAP: Never risk more than 3% per bet
-    max_bankroll_stake = settings.amount * 0.03
-    stake = min(stake, max_bankroll_stake)
+    # Respect explicit max_stake if provided, else apply default 3% bankroll cap
+    if settings.max_stake > 0:
+        stake = min(stake, settings.max_stake)
+    else:
+        max_bankroll_stake = settings.amount * 0.03
+        stake = min(stake, max_bankroll_stake)
 
     stake = _clamp_stake(stake, settings)
     if stake <= 0:

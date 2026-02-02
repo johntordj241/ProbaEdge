@@ -21,10 +21,13 @@ class JournalistAnalyzer:
         self.df["fixture_date"] = pd.to_datetime(
             self.df["fixture_date"], utc=True, errors="coerce"
         )
-        # Convertir les colonnes numériques
+        # Convertir les colonnes numériques (robuste)
         for col in ["prob_home", "prob_away", "prob_draw", "goals_home", "goals_away"]:
             if col in self.df.columns:
                 self.df[col] = pd.to_numeric(self.df[col], errors="coerce")
+        # Forcer result_winner en str (pour éviter float/str)
+        if "result_winner" in self.df.columns:
+            self.df["result_winner"] = self.df["result_winner"].astype(str)
         self.client = None
         if OPENAI_AVAILABLE and os.getenv("OPENAI_API_KEY"):
             self.client = OpenAI()
@@ -76,7 +79,14 @@ class JournalistAnalyzer:
         try:
             prob_home = float(prob_home)
             prob_away = float(prob_away)
-        except:
+        except Exception as e:
+            alerts.append(
+                {
+                    "type": "conversion_error",
+                    "severity": "low",
+                    "message": f"Erreur de conversion des probabilités: {e}",
+                }
+            )
             return alerts
 
         # Anomalie 1: Probabilité déséquilibrée vs cote
@@ -90,37 +100,60 @@ class JournalistAnalyzer:
             )
 
         # Anomalie 2: Vérifier les séries récentes
-        home_recent = (
-            self.df[self.df["home_team"] == home_team]
-            .sort_values("fixture_date", ascending=False)
-            .head(5)
-        )
-        away_recent = (
-            self.df[self.df["away_team"] == away_team]
-            .sort_values("fixture_date", ascending=False)
-            .head(5)
-        )
+        try:
+            home_recent = (
+                self.df[self.df["home_team"] == home_team]
+                .sort_values("fixture_date", ascending=False)
+                .head(5)
+            )
+            away_recent = (
+                self.df[self.df["away_team"] == away_team]
+                .sort_values("fixture_date", ascending=False)
+                .head(5)
+            )
 
-        if len(home_recent) > 0 and len(away_recent) > 0:
-            try:
-                home_wins = len(
-                    home_recent[home_recent["result_winner"].isin(["home", "1"])]
-                )
-                away_wins = len(
-                    away_recent[away_recent["result_winner"].isin(["away", "2"])]
-                )
+            if len(home_recent) > 0 and len(away_recent) > 0:
+                try:
+                    # Forcer result_winner en str
+                    home_recent = home_recent.copy()
+                    away_recent = away_recent.copy()
+                    home_recent["result_winner"] = home_recent["result_winner"].astype(
+                        str
+                    )
+                    away_recent["result_winner"] = away_recent["result_winner"].astype(
+                        str
+                    )
+                    home_wins = len(
+                        home_recent[home_recent["result_winner"].isin(["home", "1"])]
+                    )
+                    away_wins = len(
+                        away_recent[away_recent["result_winner"].isin(["away", "2"])]
+                    )
 
-                if home_wins == 0 and away_wins >= 3:
+                    if home_wins == 0 and away_wins >= 3:
+                        alerts.append(
+                            {
+                                "type": "forme_contraste",
+                                "severity": "high",
+                                "message": f"🔴 {home_team} en mauvaise forme (0/5) vs {away_team} en bonne forme (3/5+)",
+                            }
+                        )
+                except Exception as e:
                     alerts.append(
                         {
-                            "type": "forme_contraste",
-                            "severity": "high",
-                            "message": f"🔴 {home_team} en mauvaise forme (0/5) vs {away_team} en bonne forme (3/5+)",
+                            "type": "recent_form_error",
+                            "severity": "low",
+                            "message": f"Erreur lors de l'analyse des séries récentes: {e}",
                         }
                     )
-            except Exception as e:
-                # Ignorer les erreurs de comparaison
-                pass
+        except Exception as e:
+            alerts.append(
+                {
+                    "type": "dataframe_error",
+                    "severity": "low",
+                    "message": f"Erreur DataFrame: {e}",
+                }
+            )
 
         return alerts
 

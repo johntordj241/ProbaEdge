@@ -58,6 +58,7 @@ DEFAULT_SCORELINE_MODE = "dc"
 DEFAULT_DC_TAU = 0.06
 DEFAULT_BIVARIATE_RHO = 0.03
 
+
 @lru_cache(maxsize=1)
 def _load_outcome_model() -> Any:
     if not OUTCOME_MODEL_PATH.exists():
@@ -67,16 +68,24 @@ def _load_outcome_model() -> Any:
     except Exception:
         return None
 
-def _normalize_probability_map(values: Dict[str, float], fallback: Dict[str, float]) -> Dict[str, float]:
+
+def _normalize_probability_map(
+    values: Dict[str, float], fallback: Dict[str, float]
+) -> Dict[str, float]:
     normalized: Dict[str, float] = {}
     for key in PROBABILITY_KEYS:
-        normalized[key] = max(0.0, min(1.0, float(values.get(key, fallback.get(key, 0.0)) or 0.0)))
+        normalized[key] = max(
+            0.0, min(1.0, float(values.get(key, fallback.get(key, 0.0)) or 0.0))
+        )
     total = sum(normalized.values())
     if total > 0:
         normalized = {key: val / total for key, val in normalized.items()}
     else:
-        normalized = {key: float(fallback.get(key, 0.0) or 0.0) for key in PROBABILITY_KEYS}
+        normalized = {
+            key: float(fallback.get(key, 0.0) or 0.0) for key in PROBABILITY_KEYS
+        }
     return normalized
+
 
 def _ml_feature_vector(
     probs: Dict[str, float],
@@ -115,8 +124,11 @@ def _ml_feature_vector(
         "pressure_score": float(meta.get("pressure_score", 0.0)),
         "intensity_score": float(meta.get("intensity_score", 0.0)),
     }
-    vector = np.array([[feature_map[name] for name in OUTCOME_FEATURE_COLUMNS]], dtype=float)
+    vector = np.array(
+        [[feature_map[name] for name in OUTCOME_FEATURE_COLUMNS]], dtype=float
+    )
     return feature_map, vector
+
 
 def calibrate_match_probabilities(
     probs: Dict[str, float],
@@ -161,6 +173,7 @@ def _safe_float(value: Any, fallback: float = 0.0) -> float:
 
 # ---- Loi de Poisson & variantes ----
 
+
 def poisson_probability(lmbda: float, k: int) -> float:
     return float(_goal_poisson_probability(lmbda, k))
 
@@ -185,7 +198,20 @@ def poisson_matrix(
     return _normalize_score_matrix(raw_matrix)
 
 
-def aggregate_poisson_markets(matrix: Sequence[Sequence[float]]) -> Dict[str, float]:
+def aggregate_poisson_markets(
+    matrix: Sequence[Sequence[float]],
+    defense_home: Optional[float] = None,
+    defense_away: Optional[float] = None,
+    baseline_defense: Optional[float] = None,
+) -> Dict[str, float]:
+    """Agrège la matrice Poisson en marchés (1X2, Over/Under, BTTS).
+
+    Args:
+        matrix: Matrice Poisson de probabilités de scores
+        defense_home: Buts encaissés/match de l'équipe à domicile (mesurant sa défense)
+        defense_away: Buts encaissés/match de l'équipe en déplacement
+        baseline_defense: Défense moyenne de la ligue (pour normalisation)
+    """
     home = draw = away = over_1_5 = over_2_5 = btts_yes = 0.0
     for i, row in enumerate(matrix):
         for j, prob in enumerate(row):
@@ -201,6 +227,26 @@ def aggregate_poisson_markets(matrix: Sequence[Sequence[float]]) -> Dict[str, fl
                 over_2_5 += prob
             if i > 0 and j > 0:
                 btts_yes += prob
+
+    # Ajustement BTTS basé sur la qualité défensive réelle
+    if (
+        defense_home is not None
+        and defense_away is not None
+        and baseline_defense is not None
+    ):
+        baseline_defense = max(baseline_defense, 0.1)
+        # Facteur de défense normalisé (1.0 = défense moyenne)
+        # Si défense_home > baseline : mauvaise défense (encaisse plus)
+        defense_factor_home = defense_home / baseline_defense
+        defense_factor_away = defense_away / baseline_defense
+
+        # Produit des facteurs défensifs : si l'un ou l'autre a une mauvaise défense, BTTS monte
+        btts_adjustment = defense_factor_home * defense_factor_away
+
+        # Appliquer l'ajustement (capped à 1.5x pour éviter distorsions extrêmes)
+        adjustment_multiplier = min(1.5, max(0.7, btts_adjustment))
+        btts_yes = min(1.0, btts_yes * adjustment_multiplier)
+
     return {
         "home": home,
         "draw": draw,
@@ -212,20 +258,25 @@ def aggregate_poisson_markets(matrix: Sequence[Sequence[float]]) -> Dict[str, fl
     }
 
 
-def top_scorelines(matrix: Sequence[Sequence[float]], home: str, away: str, limit: int = 5) -> List[Dict[str, Any]]:
+def top_scorelines(
+    matrix: Sequence[Sequence[float]], home: str, away: str, limit: int = 5
+) -> List[Dict[str, Any]]:
     scores: List[Dict[str, Any]] = []
     for i, row in enumerate(matrix):
         for j, prob in enumerate(row):
-            scores.append({
-                "score": (i, j),
-                "prob": prob,
-                "label": f"{home} {i}-{j} {away}",
-            })
+            scores.append(
+                {
+                    "score": (i, j),
+                    "prob": prob,
+                    "label": f"{home} {i}-{j} {away}",
+                }
+            )
     scores.sort(key=lambda item: item["prob"], reverse=True)
     return scores[:limit]
 
 
 # ---- Loi Binomiale ----
+
 
 def binomial_goal_probability(success_rate: float, attempts: float) -> float:
     """Probabilité qu'un joueur marque au moins un but sur 'attempts' opportunités."""
@@ -242,10 +293,11 @@ def binomial_probability(p: float, n: int, k: int) -> float:
     if p <= 0 or n <= 0 or k < 0:
         return 0.0
     p = min(max(p, 0.0), 1.0)
-    return comb(n, k) * (p ** k) * ((1 - p) ** (n - k))
+    return comb(n, k) * (p**k) * ((1 - p) ** (n - k))
 
 
 # ---- Loi Normale ----
+
 
 def z_score(value: float, mean_value: float, std_dev: float) -> float:
     if std_dev == 0:
@@ -256,6 +308,7 @@ def z_score(value: float, mean_value: float, std_dev: float) -> float:
 # ---------------------------------------------------------------------------
 # Structures métiers
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class TeamStrength:
@@ -295,19 +348,30 @@ class ContextAdjustments:
 # Calcul des forces / λ attendus (Poisson + Normale)
 # ---------------------------------------------------------------------------
 
+
 def compute_league_baseline(standings: Iterable[Dict[str, Any]]) -> LeagueBaseline:
     attacks: List[float] = []
     defenses: List[float] = []
     for row in standings:
         played = _safe(row, "all", "played", default=0) or 0
-        gf = _safe(row, "all", "goals", "for", default=_safe(row, "goals", "for", default=0))
-        ga = _safe(row, "all", "goals", "against", default=_safe(row, "goals", "against", default=0))
+        gf = _safe(
+            row, "all", "goals", "for", default=_safe(row, "goals", "for", default=0)
+        )
+        ga = _safe(
+            row,
+            "all",
+            "goals",
+            "against",
+            default=_safe(row, "goals", "against", default=0),
+        )
         if played:
             attacks.append(gf / played)
             defenses.append(ga / played)
     if not attacks:
         # fallback typique Ligue 1
-        return LeagueBaseline(avg_attack=1.45, avg_defense=1.35, std_attack=0.35, std_defense=0.3)
+        return LeagueBaseline(
+            avg_attack=1.45, avg_defense=1.35, std_attack=0.35, std_defense=0.3
+        )
     return LeagueBaseline(
         avg_attack=mean(attacks),
         avg_defense=mean(defenses),
@@ -320,8 +384,16 @@ def _goals_per_match(row: Dict[str, Any]) -> Tuple[float, float]:
     played = _safe(row, "all", "played", default=0) or 0
     if not played:
         return 1.4, 1.2
-    gf = _safe(row, "all", "goals", "for", default=_safe(row, "goals", "for", default=0))
-    ga = _safe(row, "all", "goals", "against", default=_safe(row, "goals", "against", default=0))
+    gf = _safe(
+        row, "all", "goals", "for", default=_safe(row, "goals", "for", default=0)
+    )
+    ga = _safe(
+        row,
+        "all",
+        "goals",
+        "against",
+        default=_safe(row, "goals", "against", default=0),
+    )
     return gf / played, ga / played
 
 
@@ -393,8 +465,17 @@ def expected_goals_from_standings(
         goals_against = baseline.avg_defense
         played = 1.0
         if row:
-            goals_against = _safe(row, "all", "goals", "against", default=_safe(row, "goals", "against", default=baseline.avg_defense))
-            played = _safe(row, "all", "played", default=_safe(row, "played", default=1.0)) or 1.0
+            goals_against = _safe(
+                row,
+                "all",
+                "goals",
+                "against",
+                default=_safe(row, "goals", "against", default=baseline.avg_defense),
+            )
+            played = (
+                _safe(row, "all", "played", default=_safe(row, "played", default=1.0))
+                or 1.0
+            )
         try:
             return max(float(goals_against) / float(played), 0.1)
         except (TypeError, ZeroDivisionError, ValueError):
@@ -426,6 +507,7 @@ def expected_goals_from_standings(
 # ---------------------------------------------------------------------------
 # Ajustements contextuels (météo, fatigue, suspensions, mi-temps, live)
 # ---------------------------------------------------------------------------
+
 
 def adjust_lambdas_context(
     lambda_home: float,
@@ -469,7 +551,10 @@ def adjust_lambdas_context(
         description = str(weather.get("description") or "").lower()
         wind = weather.get("wind")
         temperature = weather.get("temperature")
-        if any(token in description for token in ("rain", "pluie", "shower", "orage", "storm", "neige", "snow")):
+        if any(
+            token in description
+            for token in ("rain", "pluie", "shower", "orage", "storm", "neige", "snow")
+        ):
             apply_global(0.95, "Météo défavorable (pluie/neige)")
         if isinstance(wind, (int, float)) and float(wind) >= 30.0:
             apply_global(0.93, "Vent fort (>30 km/h)")
@@ -486,13 +571,23 @@ def adjust_lambdas_context(
     inj_key_away = context_map.get("key_injuries_away", 0)
 
     if susp_home:
-        apply_home(max(0.80, 1.0 - 0.07 * float(susp_home)), f"Suspensions clés ({susp_home})")
+        apply_home(
+            max(0.80, 1.0 - 0.07 * float(susp_home)), f"Suspensions clés ({susp_home})"
+        )
     if susp_away:
-        apply_away(max(0.80, 1.0 - 0.07 * float(susp_away)), f"Suspensions clés ({susp_away})")
+        apply_away(
+            max(0.80, 1.0 - 0.07 * float(susp_away)), f"Suspensions clés ({susp_away})"
+        )
     if inj_key_home:
-        apply_home(max(0.82, 1.0 - 0.05 * float(inj_key_home)), f"Blessures clés ({inj_key_home})")
+        apply_home(
+            max(0.82, 1.0 - 0.05 * float(inj_key_home)),
+            f"Blessures clés ({inj_key_home})",
+        )
     if inj_key_away:
-        apply_away(max(0.82, 1.0 - 0.05 * float(inj_key_away)), f"Blessures clés ({inj_key_away})")
+        apply_away(
+            max(0.82, 1.0 - 0.05 * float(inj_key_away)),
+            f"Blessures clés ({inj_key_away})",
+        )
 
     rest_home = context_map.get("rest_hours_home")
     rest_away = context_map.get("rest_hours_away")
@@ -522,6 +617,7 @@ def adjust_lambdas_context(
     lambda_home = clamp(lambda_home)
     lambda_away = clamp(lambda_away)
     return lambda_home, lambda_away, notes_home, notes_away
+
 
 def adjust_lambdas_at_halftime(
     lambda_home: float,
@@ -590,7 +686,9 @@ def apply_context_adjustments(
                 count += 1
         return count
 
-    def _injury_notes(entries: Optional[List[Dict[str, Any]]], team_name: str) -> List[str]:
+    def _injury_notes(
+        entries: Optional[List[Dict[str, Any]]], team_name: str
+    ) -> List[str]:
         notes: List[str] = []
         seen: set[str] = set()
         for entry in entries or []:
@@ -621,7 +719,9 @@ def apply_context_adjustments(
 
         def shots_for(team_type: str) -> Optional[int]:
             for block in stats:
-                if _safe(block, "team", "id") == (home.team_id if team_type == "home" else away.team_id):
+                if _safe(block, "team", "id") == (
+                    home.team_id if team_type == "home" else away.team_id
+                ):
                     for stat in block.get("statistics", []):
                         if stat.get("type") == "Shots on Goal":
                             return _safe(stat, "value", default=None)
@@ -638,7 +738,9 @@ def apply_context_adjustments(
         home.lambda_value = max(MIN_LAMBDA, hom_l)
         away.lambda_value = max(MIN_LAMBDA, awa_l)
         context.halftime = True
-        context.halftime_message = f"Réajusté à la mi-temps : {goals_home}-{goals_away}."
+        context.halftime_message = (
+            f"Réajusté à la mi-temps : {goals_home}-{goals_away}."
+        )
 
     # Cartons rouges / blessures dans events
     weather_block = _safe(fixture, "fixture", "weather", default={})
@@ -658,7 +760,11 @@ def apply_context_adjustments(
                 context.weather = ", ".join(parts)
         else:
             context.weather = str(weather_block)
-        context_payload["weather"] = weather_block if isinstance(weather_block, dict) else {"description": weather_block}
+        context_payload["weather"] = (
+            weather_block
+            if isinstance(weather_block, dict)
+            else {"description": weather_block}
+        )
 
     referee_label = _safe(fixture, "fixture", "referee")
     if referee_label:
@@ -666,7 +772,9 @@ def apply_context_adjustments(
     referee_stats = _safe(fixture, "fixture", "referee_stats", default={})
     ref_pen_rate = None
     if isinstance(referee_stats, dict):
-        raw_rate = referee_stats.get("penalties_per_game") or referee_stats.get("penalties_per_90")
+        raw_rate = referee_stats.get("penalties_per_game") or referee_stats.get(
+            "penalties_per_90"
+        )
         if isinstance(raw_rate, (int, float)):
             ref_pen_rate = float(raw_rate)
     context_payload["referee_penalty_rate"] = ref_pen_rate
@@ -743,6 +851,7 @@ def apply_context_adjustments(
 # Buteurs probables (Poisson + Binomiale)
 # ---------------------------------------------------------------------------
 
+
 def probable_goalscorers(
     league_id: int,
     season: int,
@@ -764,7 +873,11 @@ def probable_goalscorers(
         if not name:
             return ""
         normalized = unicodedata.normalize("NFKD", name)
-        return "".join(ch for ch in normalized if not unicodedata.combining(ch)).strip().lower()
+        return (
+            "".join(ch for ch in normalized if not unicodedata.combining(ch))
+            .strip()
+            .lower()
+        )
 
     injured_home_set = {_normalize_name(name) for name in (injured_home or []) if name}
     injured_away_set = {_normalize_name(name) for name in (injured_away or []) if name}
@@ -791,7 +904,9 @@ def probable_goalscorers(
         shots_per_match = shots / apps if shots else 2.2
         success_rate = goals / shots if shots else min(0.65, goals / apps)
         lambda_team = lambda_home if team_id == home_id else lambda_away
-        prob = binomial_goal_probability(success_rate, max(shots_per_match, lambda_team * 2))
+        prob = binomial_goal_probability(
+            success_rate, max(shots_per_match, lambda_team * 2)
+        )
         return {
             "team_id": team_id,
             "name": _safe(entry, "player", "name", default="Buteur"),
@@ -805,9 +920,13 @@ def probable_goalscorers(
         if candidate and not _is_injured(candidate["name"], candidate["team_id"]):
             picks.append(candidate)
 
-    def fill_from_squad(players: List[Dict[str, Any]], team_id: int, lambda_team: float) -> None:
+    def fill_from_squad(
+        players: List[Dict[str, Any]], team_id: int, lambda_team: float
+    ) -> None:
         def _player_position(entry: Dict[str, Any]) -> str:
-            return str(_safe(entry, "statistics", 0, "games", "position", default="")).lower()
+            return str(
+                _safe(entry, "statistics", 0, "games", "position", default="")
+            ).lower()
 
         def _scoring_metric(entry: Dict[str, Any]) -> float:
             stats = _safe(entry, "statistics", 0, default={})
@@ -819,10 +938,7 @@ def probable_goalscorers(
             shots_per_90 = shots / matches
             return (goals_per_90 * 0.7) + (shots_per_90 * 0.3)
 
-        candidates = [
-            p for p in players
-            if not _player_position(p).startswith("gk")
-        ]
+        candidates = [p for p in players if not _player_position(p).startswith("gk")]
         if not candidates:
             candidates = players[:4]
         candidates.sort(key=_scoring_metric, reverse=True)
@@ -885,7 +1001,12 @@ def editorial_summary(
     sentences.append(
         f"Les formes normalisées (loi normale) confirment un z-score attaque de {home.name}: {home.z_score:+.2f} contre {away.name}: {away.z_score:+.2f}."
     )
-    dominant = max(("domicile", probs["home"]), ("nul", probs["draw"]), ("extérieur", probs["away"]), key=lambda x: x[1])
+    dominant = max(
+        ("domicile", probs["home"]),
+        ("nul", probs["draw"]),
+        ("extérieur", probs["away"]),
+        key=lambda x: x[1],
+    )
     sentences.append(
         f"Le marché 1X2 penche vers {dominant[0]} ({dominant[1]*100:.1f}%)."
     )
@@ -901,9 +1022,7 @@ def editorial_summary(
         "Le modèle reste purement statistique : il pondère les absences détectées (cartons/blessures dans le flux live) "
         "mais recommande de vérifier les informations tactiques avant de parier."
     )
-    return " " .join(sentences)
-
-
+    return " ".join(sentences)
 
 
 def project_match_outcome(
@@ -934,15 +1053,22 @@ def project_match_outcome(
         else:
             final_probs["away"] = 1.0
         label = f"{home.name} {goals_home}-{goals_away} {away.name}"
-        return final_probs, [
-            {"label": label, "prob": 1.0, "score": (goals_home, goals_away)}
-        ], None
+        return (
+            final_probs,
+            [{"label": label, "prob": 1.0, "score": (goals_home, goals_away)}],
+            None,
+        )
 
     lambda_home = max(MIN_LAMBDA, float(home.lambda_value))
     lambda_away = max(MIN_LAMBDA, float(away.lambda_value))
     matrix_mode = matrix_mode or DEFAULT_SCORELINE_MODE
 
-    is_live = elapsed is not None and isinstance(elapsed, (int, float)) and elapsed > 0 and status_short not in {"NS", "TBD"}
+    is_live = (
+        elapsed is not None
+        and isinstance(elapsed, (int, float))
+        and elapsed > 0
+        and status_short not in {"NS", "TBD"}
+    )
     if is_live:
         meta = markov_meta or {}
         pressure_score = 0.0
@@ -968,9 +1094,18 @@ def project_match_outcome(
         lambda_away = max(MIN_LAMBDA, min(MAX_LAMBDA, lambda_away * factor_away))
 
     if not is_live:
-        base_matrix = poisson_matrix(lambda_home, lambda_away, max_goals=max_goals, mode=matrix_mode)
+        base_matrix = poisson_matrix(
+            lambda_home, lambda_away, max_goals=max_goals, mode=matrix_mode
+        )
+        # Créer une baseline par défaut pour l'ajustement BTTS
+        default_baseline_defense = 1.35  # Valeur moyenne typique Ligue 1
         return (
-            aggregate_poisson_markets(base_matrix),
+            aggregate_poisson_markets(
+                base_matrix,
+                defense_home=home.defense,
+                defense_away=away.defense,
+                baseline_defense=default_baseline_defense,
+            ),
             top_scorelines(base_matrix, home.name, away.name, limit=5),
             base_matrix,
         )
@@ -1036,8 +1171,14 @@ def probability_confidence_interval(
     matrix_mode = matrix_mode or DEFAULT_SCORELINE_MODE
 
     for scale in (0.9, 1.1):
-        scaled_home = replace(home, lambda_value=max(MIN_LAMBDA, min(MAX_LAMBDA, home.lambda_value * scale)))
-        scaled_away = replace(away, lambda_value=max(MIN_LAMBDA, min(MAX_LAMBDA, away.lambda_value * scale)))
+        scaled_home = replace(
+            home,
+            lambda_value=max(MIN_LAMBDA, min(MAX_LAMBDA, home.lambda_value * scale)),
+        )
+        scaled_away = replace(
+            away,
+            lambda_value=max(MIN_LAMBDA, min(MAX_LAMBDA, away.lambda_value * scale)),
+        )
         probs, _, matrix = project_match_outcome(
             scaled_home,
             scaled_away,

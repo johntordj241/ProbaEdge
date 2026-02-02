@@ -9,15 +9,19 @@ Améliorations :
 - Message d’erreur clair si le CSV n’est pas lisible.
 """
 
-import os
 import io
+import os
 import sys
-import json
-import requests
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import pandas as pd
 import psycopg2
-from psycopg2.extras import execute_values
+import requests
 from dotenv import load_dotenv
+from psycopg2.extras import Json, execute_values
+
+from utils.prediction_metrics import ensure_success_flag
 
 load_dotenv()
 
@@ -44,8 +48,8 @@ def get_signed_url(bucket: str, path: str, expires: int = 60) -> str:
     payload = {"expiresIn": expires}
     try:
         resp = requests.post(endpoint, headers=headers, json=payload, timeout=15)
-    except requests.RequestException as e:
-        raise SystemExit(f"Erreur requête vers l'endpoint de signature: {e}")
+    except requests.RequestException as exc:
+        raise SystemExit(f"Erreur requête vers l'endpoint de signature: {exc}")
 
     if resp.status_code != 200:
         try:
@@ -76,8 +80,8 @@ def get_signed_url(bucket: str, path: str, expires: int = 60) -> str:
 def download_csv_as_df(signed_url: str) -> pd.DataFrame:
     try:
         resp = requests.get(signed_url, timeout=30)
-    except requests.RequestException as e:
-        raise SystemExit(f"Erreur lors du GET de l'URL signée: {e}")
+    except requests.RequestException as exc:
+        raise SystemExit(f"Erreur lors du GET de l'URL signée: {exc}")
 
     try:
         resp.raise_for_status()
@@ -99,8 +103,8 @@ def download_csv_as_df(signed_url: str) -> pd.DataFrame:
     buffer = io.BytesIO(resp.content)
     try:
         df = pd.read_csv(buffer, sep=CSV_SEPARATOR)
-    except Exception as e:
-        raise RuntimeError(f"Impossible de parser le CSV: {e}\n(aperçu du contenu: {preview_text[:500]})")
+    except Exception as exc:
+        raise RuntimeError(f"Impossible de parser le CSV: {exc}\n(aperçu du contenu: {preview_text[:500]})")
     return df
 
 
@@ -112,27 +116,208 @@ def normalize_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def insert_dataframe_to_db(df: pd.DataFrame, table: str = "public.prediction_history"):
-    if df.empty:
-        print("DataFrame vide – rien à insérer.")
+RECORD_COLUMNS = [
+    "timestamp_utc",
+    "fixture_id",
+    "league_id",
+    "season",
+    "home_team",
+    "away_team",
+    "selection",
+    "confidence",
+    "status_snapshot",
+    "success_flag",
+    "bet_stake",
+    "bet_odd",
+    "bet_return",
+    "edge_comment",
+    "metadata",
+    "created_at",
+]
+EXCLUDED_METADATA_KEYS = {
+    "timestamp",
+    "fixture_date",
+    "fixture_id",
+    "league_id",
+    "season",
+    "home_team",
+    "away_team",
+    "main_pick",
+    "main_confidence",
+    "selection",
+    "confidence",
+    "status_snapshot",
+    "success_flag",
+    "bet_stake",
+    "bet_odd",
+    "bet_return",
+    "edge_comment",
+    "metadata",
+    "created_at",
+}
+
+
+def _parse_timestamp(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    try:
+        ts = pd.to_datetime(value, utc=True)
+    except Exception:
+        return None
+    if pd.isna(ts):
+        return None
+    return ts.isoformat()
+
+
+def _safe_int(value: Any) -> Optional[int]:
+    if value is None or pd.isna(value):
+        return None
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_float(value: Any) -> Optional[float]:
+    if value is None or pd.isna(value):
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        return None
+
+
+def _nonempty_text(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _serialize_metadata_value(value: Any) -> Any:
+    if value is None or pd.isna(value):
+        return None
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, str):
+        text = value.strip()
+        return text or None
+    if hasattr(value, "item") and not isinstance(value, (str, bytes)):
+        try:
+            primitive = value.item()
+        except Exception:
+            primitive = value
+        if isinstance(primitive, (int, float, bool, str)):
+            return primitive
+        try:
+            return str(primitive)
+        except Exception:
+            return None
+    return value
+
+
+def _build_metadata(row: pd.Series) -> Dict[str, Any]:
+    metadata: Dict[str, Any] = {}
+    for key, value in row.items():
+        if key in EXCLUDED_METADATA_KEYS:
+            continue
+        serialized = _serialize_metadata_value(value)
+        if serialized is None:
+            continue
+        metadata[key] = serialized
+    return metadata
+
+
+def _construct_record(row: pd.Series) -> Optional[Dict[str, Any]]:
+    timestamp = _parse_timestamp(row.get("timestamp"))
+    if not timestamp:
+        return None
+    fixture_id = _safe_int(row.get("fixture_id"))
+    if fixture_id is None:
+        return None
+    league_id = _safe_int(row.get("league_id"))
+    season = _safe_int(row.get("season"))
+    home_team = _nonempty_text(row.get("home_team")) or ""
+    away_team = _nonempty_text(row.get("away_team")) or ""
+    selection = _nonempty_text(row.get("bet_selection")) or _nonempty_text(row.get("main_pick"))
+    confidence = _safe_float(row.get("main_confidence"))
+    status_snapshot = _nonempty_text(row.get("status_snapshot"))
+    success_value = row.get("success_flag")
+    if success_value is None or pd.isna(success_value):
+        success_flag: Optional[bool] = None
+    else:
+        success_flag = bool(success_value)
+    bet_stake = _safe_float(row.get("bet_stake"))
+    bet_odd = _safe_float(row.get("bet_odd"))
+    bet_return = _safe_float(row.get("bet_return"))
+    edge_comment = _nonempty_text(row.get("edge_comment"))
+    metadata = _build_metadata(row)
+    record: Dict[str, Any] = {
+        "timestamp_utc": timestamp,
+        "fixture_id": fixture_id,
+        "league_id": league_id,
+        "season": season,
+        "home_team": home_team,
+        "away_team": away_team,
+        "selection": selection,
+        "confidence": confidence,
+        "status_snapshot": status_snapshot,
+        "success_flag": success_flag,
+        "bet_stake": bet_stake,
+        "bet_odd": bet_odd,
+        "bet_return": bet_return,
+        "edge_comment": edge_comment,
+        "metadata": metadata or None,
+        "created_at": timestamp,
+    }
+    return record
+
+
+def _prepare_records(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    records: List[Dict[str, Any]] = []
+    for _, row in df.iterrows():
+        record = _construct_record(row)
+        if record:
+            records.append(record)
+    return records
+
+
+def insert_records_to_db(records: List[Dict[str, Any]], table: str = "public.prediction_history"):
+    if not records:
+        print("Aucun enregistrement à insérer.")
         return
 
-    cols = list(df.columns)
-    columns_sql = ", ".join([f'"{c}"' for c in cols])
-    template = "(" + ", ".join(["%s"] * len(cols)) + ")"
+    columns = RECORD_COLUMNS
+    columns_sql = ", ".join([f'"{c}"' for c in columns])
+    template = "(" + ", ".join(["%s"] * len(columns)) + ")"
     insert_sql = f"INSERT INTO {table} ({columns_sql}) VALUES %s ON CONFLICT DO NOTHING;"
 
-    records = [tuple(row) for row in df.itertuples(index=False, name=None)]
+    values = []
+    for record in records:
+        row_values = []
+        for col in columns:
+            value = record.get(col)
+            if col == "metadata" and isinstance(value, dict):
+                value = Json(value)
+            row_values.append(value)
+        values.append(tuple(row_values))
 
     try:
         conn = psycopg2.connect(SUPABASE_DB_URL)
-    except Exception as e:
-        raise SystemExit(f"Impossible de se connecter à la DB: {e}")
+    except Exception as exc:
+        raise SystemExit(f"Impossible de se connecter à la DB: {exc}")
 
     try:
         with conn, conn.cursor() as cur:
-            execute_values(cur, insert_sql, records, template=template)
-        print(f"{len(records)} lignes insérées (ou ignorées si doublons).")
+            execute_values(cur, insert_sql, values, template=template)
+        print(f"{len(values)} lignes insérées (ou ignorées si doublons).")
     finally:
         conn.close()
 
@@ -149,16 +334,19 @@ def main():
     print("Colonnes CSV :", ", ".join(df.columns))
 
     df = normalize_df(df)
+    df = ensure_success_flag(df)
     print("Colonnes après normalisation :", ", ".join(df.columns))
 
-    insert_dataframe_to_db(df)
+    records = _prepare_records(df)
+    print(f"{len(records)} enregistrements prêts pour l'insertion.")
+
+    insert_records_to_db(records)
     print("Import terminé.")
 
 
 if __name__ == "__main__":
     try:
         main()
-    except Exception as e:
-        print("Erreur:", e)
+    except Exception as exc:
+        print("Erreur:", exc)
         sys.exit(1)
-

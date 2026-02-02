@@ -16,6 +16,7 @@ Proba Edge est un dashboard Streamlit. Il combine les donnees API-FOOTBALL, plus
   - Ajustement automatique de la bankroll via `utils/prediction_history.adjust_bankroll`.
 - **Scripts pret-a-l'emploi**
   - `scripts/backfill_predictions.py` pour historiser fixtures et predictions.
+  - `scripts/over_under_diagnostic.py` pour comparer les probabilités Over/Under 2.5 avec les scores réels.
   - `scripts/train_prediction_model.py` (features elargies + rapport Brier/ECE).
   - `scripts/export_supervision_metrics.py`, `scripts/check_recovery.py` pour la supervision.
   - `scripts/deploy.py` pour preparer un livrable (tests + archive).
