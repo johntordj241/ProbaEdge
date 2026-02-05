@@ -1,0 +1,13 @@
+streamlit==1.27.2
+requests
+pandas
+scikit-learn
+matplotlib
+numpy
+pytest
+pyyaml
+pyarrow
+openai
+altair
+supabase
+python-dotenv

@@ -1,0 +1,19 @@
+{
+  "accuracy": 0.6116504854368932,
+  "roc_auc": 0.6957120377655389,
+  "samples": 411,
+  "train_samples": 308,
+  "test_samples": 103,
+  "features": [
+    "feature_home_draw_diff",
+    "feature_home_away_diff",
+    "feature_over_under_diff",
+    "feature_max_prob",
+    "feature_main_confidence_norm",
+    "feature_total_pick_over"
+  ],
+  "class_distribution": {
+    "success": 249,
+    "fail": 162
+  }
+}

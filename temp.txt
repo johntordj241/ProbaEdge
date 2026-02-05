@@ -1,0 +1,260 @@
+def _note_ia_bullets(summary: str) -> List[str]:
+    parts = [part.strip() for part in summary.replace('
+', ' ').split('.') if part.strip()]
+    return parts[:4]
+
+
+def _filter_fixtures(
+    fixtures: List[Dict[str, Any]],
+    league_id: int,
+    status_filter: Optional[set[str]],
+) -> List[Dict[str, Any]]:
+    filtered: List[Dict[str, Any]] = []
+    for fx in fixtures:
+        if not isinstance(fx, dict):
+            continue
+        if fx.get("league", {}).get("id") not in {None, league_id}:
+            continue
+        if status_filter:
+            status = fx.get("fixture", {}).get("status", {}).get("short")
+            if status not in status_filter:
+                continue
+        filtered.append(fx)
+    return filtered
+
+
+def _build_fixture_options(fixtures: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    options: List[Dict[str, Any]] = []
+    for item in fixtures:
+        if not isinstance(item, dict):
+            continue
+        fixture_info = item.get("fixture") or {}
+        fixture_id = fixture_info.get("id")
+        teams_info = item.get("teams") or {}
+        home = teams_info.get("home") or {}
+        away = teams_info.get("away") or {}
+        if fixture_id:
+            date = fixture_info.get("date", "")[:16].replace("T", " ")
+            label = f"{home.get('name', '?')} vs {away.get('name', '?')} - {date}"
+            options.append({"id": fixture_id, "label": label, "data": item})
+    return options
+
+
+def show_predictions(
+    default_league_id: Optional[int] = None,
+    default_season: Optional[int] = None,
+    default_team_id: Optional[int] = None,
+) -> None:
+    st.header("Prédictions & Analyse IA")
+
+    league_id, season, league_label = select_league_and_season(
+        default_league_id=default_league_id,
+        default_season=default_season,
+    )
+    team_id = select_team(
+        league_id,
+        season,
+        default_team_id=default_team_id,
+        placeholder="Toutes les équipes",
+        key=f"predictions_team_{league_id}_{season}",
+    )
+
+    col_scope, col_limit = st.columns([1, 1])
+    with col_scope:
+        scope = st.selectbox("Sélection des matchs", ["À venir", "En cours", "Joués"], index=0)
+    with col_limit:
+        limit = st.slider("Nombre de matchs", min_value=5, max_value=30, value=15, step=1)
+
+    status_filter: Optional[set[str]] = None
+    next_n: Optional[int] = None
+    last_n: Optional[int] = None
+    live_param: Optional[str] = None
+
+    if scope == "À venir":
+        status_filter = UPCOMING_STATUS_CODES
+        next_n = limit
+    elif scope == "Joués":
+        status_filter = FINISHED_STATUS_CODES
+        last_n = limit
+    else:
+        status_filter = LIVE_STATUS_CODES
+        live_param = "all"
+        st.caption("Actualise la page ou clique sur le bouton pour suivre le direct.")
+
+    try:
+        with st.spinner("Chargement des matchs..."):
+            fixtures = get_fixtures(
+                league_id=league_id,
+                season=season,
+                team_id=team_id,
+                next_n=next_n,
+                last_n=last_n,
+                live=live_param,
+            ) or []
+    except Exception as exc:
+        st.error(f"Impossible d'interroger l'API : {exc}")
+        return
+
+    fixtures = _filter_fixtures(fixtures, league_id, status_filter)[:limit]
+    if not fixtures:
+        st.warning("Aucun match disponible avec ces filtres.")
+        return
+
+    options = _build_fixture_options(fixtures)
+    selected = st.selectbox(
+        "Choisir un match",
+        options=options,
+        index=0,
+        format_func=lambda item: item["label"],
+    )
+    fixture = selected.get("data", {})
+    fixture_id = selected.get("id")
+    if not fixture or not fixture_id:
+        st.info("Sélectionnez un match valable.")
+        return
+
+    teams = fixture.get("teams", {})
+    home_team = teams.get("home", {})
+    away_team = teams.get("away", {})
+    home_id = home_team.get("id")
+    away_id = away_team.get("id")
+    if not home_id or not away_id:
+        st.warning("Impossible d'identifier les équipes.")
+        return
+
+    standings_raw = get_standings(league_id, season) or []
+    standings_block: list[dict[str, Any]] = []
+    if isinstance(standings_raw, list) and standings_raw:
+        standings_block = standings_raw[0].get("league", {}).get("standings", [[]])[0]
+
+    home_strength, away_strength, baseline = expected_goals_from_standings(
+        standings_block,
+        int(home_id),
+        int(away_id),
+        home_team.get("name", "Équipe A"),
+        away_team.get("name", "Équipe B"),
+    )
+    context = apply_context_adjustments(home_strength, away_strength, fixture)
+
+    matrix = poisson_matrix(home_strength.lambda_value, away_strength.lambda_value)
+    probs = aggregate_poisson_markets(matrix)
+    top_scores = top_scorelines(matrix, home_strength.name, away_strength.name)
+
+    st.subheader("Résumé match")
+    for line in _match_summary_lines(fixture, home_strength, away_strength):
+        st.markdown(line)
+
+    st.subheader("Probabilités 1X2")
+    st.markdown(
+        "- ?? Victoire {home} : {home_pct}
+"
+        "- ?? Nul : {draw_pct}
+"
+        "- ?? Victoire {away} : {away_pct}".format(
+            home=home_strength.name,
+            away=away_strength.name,
+            home_pct=_format_percentage(probs.get("home", 0.0)),
+            draw_pct=_format_percentage(probs.get("draw", 0.0)),
+            away_pct=_format_percentage(probs.get("away", 0.0)),
+        )
+    )
+
+    tips = _betting_tips(home_strength, away_strength, probs)
+    if tips:
+        st.subheader("Paris conseillés (classés)")
+        for idx, tip in enumerate(tips, start=1):
+            st.markdown(
+                f"{idx}. **{tip['label']}** · proba ˜ {_format_percentage(tip['probability'])} · confiance {tip['confidence']}/100  
+"
+                f"_{tip['reason']}_"
+            )
+
+    st.subheader("Top 5 scores probables")
+    top_score_lines = [
+        f"{idx}. {item['label']} - {_format_percentage(item['prob'])}"
+        for idx, item in enumerate(top_scores[:5], start=1)
+    ]
+    st.markdown("
+".join(top_score_lines))
+
+    with st.spinner("Analyse buteurs / blessures..."):
+        top_scorers, topscorers_fallback_season = _topscorers_best_effort(league_id, season)
+        players_home = _players_best_effort(league_id, season, int(home_id))
+        players_away = _players_best_effort(league_id, season, int(away_id))
+
+    scorers = probable_goalscorers(
+        league_id,
+        season,
+        int(home_id),
+        int(away_id),
+        home_strength.lambda_value,
+        away_strength.lambda_value,
+        top_scorers,
+        players_home,
+        players_away,
+    )
+    st.subheader("Buteurs probables")
+    if scorers:
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "Joueur": s["name"],
+                        "Probabilité %": round(s["prob"] * 100, 1),
+                        "Source": "Topscorers" if s.get("source") == "topscorers" else "Effectif",
+                    }
+                    for s in scorers
+                ]
+            ),
+            hide_index=True,
+            use_container_width=True,
+        )
+        if topscorers_fallback_season and topscorers_fallback_season != season:
+            st.caption(
+                f"Buteurs basés sur la saison {topscorers_fallback_season}."
+            )
+    else:
+        if topscorers_fallback_season and topscorers_fallback_season != season:
+            st.info(
+                f"Pas de buteurs publiés pour {season} ; aucune donnée réutilisable en {topscorers_fallback_season}."
+            )
+        else:
+            st.info("Pas assez de données pour proposer des buteurs probables.")
+
+    st.subheader("Note IA – Justification")
+    for bullet in _note_ia_bullets(editorial_summary(home_strength, away_strength, probs, context, baseline)):
+        st.markdown(f"- {bullet}")
+    st.markdown(
+        "?? Analyse statistique : le modèle intègre les signaux live (cartons, mi-temps) "
+        "mais ne remplace pas l'analyse tactique (blessures de dernière minute, météo, rotation)."
+    )
+
+    st.markdown("---")
+    with st.expander("Données API (détail)", expanded=False):
+        with st.spinner("Chargement des prédictions API..."):
+            api_predictions = get_predictions(int(fixture_id))
+        if api_predictions:
+            entry = api_predictions[0] if isinstance(api_predictions, list) else api_predictions
+            prediction = entry.get("prediction") or {}
+            winner = prediction.get("winner", {}).get("name", "N/A")
+            percent = prediction.get("percent") or {}
+            st.write(f"**API :** gagnant estimé : {winner}")
+            st.write(
+                "Probabilités API - Domicile: {home}% | Nul: {draw}% | Extérieur: {away}%".format(
+                    home=percent.get("home", "N/A"),
+                    draw=percent.get("draw", "N/A"),
+                    away=percent.get("away", "N/A"),
+                )
+            )
+            advice = prediction.get("advice")
+            if advice:
+                st.write(f"Conseil API : {advice}")
+            comparison = entry.get("comparison")
+            payload = comparison if comparison else prediction
+            st.code(json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            st.info("Pas de prédictions officielles fournies par l'API pour ce match.")
+    if st.button("?? Rafraîchir l'analyse", use_container_width=True):
+        st.rerun()
+
+

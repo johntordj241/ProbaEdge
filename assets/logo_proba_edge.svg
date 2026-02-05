@@ -1,0 +1,15 @@
+﻿<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 520 200'>
+  <defs>
+    <style>
+      .curve { fill: none; stroke: #22c284; stroke-width: 16; stroke-linecap: round; stroke-linejoin: round; }
+      .check { fill: none; stroke: #f2ecdc; stroke-width: 18; stroke-linecap: round; stroke-linejoin: round; }
+      .label { font-family: 'Poppins', 'Segoe UI', sans-serif; font-weight: 600; }
+    </style>
+  </defs>
+  <g transform='translate(20,20)'>
+    <path class='curve' d='M40 140 C70 40 170 10 240 110 C260 140 280 170 300 170'/>
+    <path class='check' d='M200 110 L230 140 L285 80'/>
+    <text class='label' x='320' y='95' font-size='64' fill='#f2ecdc'>Proba</text>
+    <text class='label' x='320' y='160' font-size='64' fill='#22c284'>Edge</text>
+  </g>
+</svg>

@@ -1,0 +1,1741 @@
+openapi: 3.0.0
+info:
+  title: API-SPORTS Widgets v3.1
+  version: 3.1.0
+  description: |
+    # Introduction
+    API-SPORTS widgets allow you to easily display **dynamic sports data** on your website.
+
+    They are designed to be:
+
+    - **Ultra-modular**: each component is autonomous
+    - **Customisable**: language, theme, content, behaviour
+    - **Easy to integrate**: no framework required, a simple HTML tag is all you need
+
+    They use request from your API-SPORTS account and work with **all plans**, including the free plan.  
+
+    ## Security
+    Our widgets use your account's API-KEY, which must be specified in the `data-key` attribute of your widget configuration.
+
+    When using these widgets it is important to be aware that your API-KEY will be visible to the users of your site, it is possible to protect yourself from this by allowing only the desired domains or IP in our [dashboard](https://dashboard.api-football.com/profile?access).
+    This way no one else can use your API-KEY for you. If you have already set up your widget and have not activated this option, you can reset your API-KEY and activate this option after.
+
+    You can further enhance security by completely hiding your API-KEY from the source code by following this [tutorial](https://www.api-football.com/news/post/how-to-optimize-widgets-cache-and-security-tutorial).
+
+    ## Caching Data
+
+    By using Widgets, each visit to a page on your website triggers one or more API requests to retrieve data. Without a caching system, your daily quota can be reached very quickly.
+
+    **Example:**
+    If a page triggers a single API request per visitor and you receive 80 visits to that page in one minute, this results in **80 API requests**. Over a full day, that can add up to **115 200 requests**.
+
+    By implementing a caching system, even with a very short duration, such as **60 seconds**, you can drastically reduce the number of requests. The first visit will trigger an API request, but the response will then be cached for the next 60 seconds. This means that if 80 visitors access the same page within that time frame, **only the first request** will reach the API, while the next 79 will be served directly from the cache.
+
+    With this system in place, you reduce usage from **115 200** requests per day to just **1 440**.
+
+    A full tutorial is available [here](https://www.api-football.com/news/post/how-to-optimize-widgets-cache-and-security-tutorial), explaining step by step how to set up an effective caching system.
+
+    <img src='https://api-sports-media-temp.b-cdn.net/widgets/cache-data.png'/>
+
+
+    ## Debugging
+    If the widget does not display the requested information, it is possible to set the `data-show-errors` tag to **true** to display error messages directly in the widget and in the console. This can be due to several things like : *(Non-exhaustive list)*
+    - You have reached your daily number of requests
+    - Tags are incorrectly filled in
+    - Your API-KEY is incorrect
+
+    ## Logos / Images
+
+    Calls to logos/images do not count towards your daily quota and are provided for free. However these calls are subject to a **rate per second & minute**, it is recommended to save this data on your side in order not to slow down or impact the user experience of your application or website. For this you can use **CDNs** such as [bunny.net](https://bunny.net?ref=8r6al7jhm4).
+
+    We have a tutorial available [here](https://www.api-football.com/news/post/optimizing-sports-websites-bunnycdn-api-sports-image-storage-guide), which explains how to set up your own media system with **BunnyCDN**. Once you have done this, all you need to do is to set the `data-logo-url` parameter with the URL of your CDN.
+
+    Logos, images and trademarks delivered through the API are provided solely for identification and descriptive purposes (e.g., identifying leagues, teams, players or venues). We does not own any of these visual assets, and no intellectual property rights are claimed over them. Some images or data may be subject to intellectual property or trademark rights held by third parties (including but not limited to leagues, federations, or clubs). The use of such content in your applications, websites, or products may require additional authorization or licensing from the respective rights holders. You are fully responsible for ensuring that your usage of any logos, images, or branded content complies with applicable laws in your country or the countries where your services are made available. We are not affiliated with, sponsored by, or endorsed by any sports league, federation, or brand featured in the data provided.
+
+    ## All available widgets
+    Below is a list of all available widgets:
+
+    - `games` → list of matches
+    - `game` → details of a match
+    - `team` → team profile
+    - `player` → player profile
+    - `standings` → league table
+    - `league` → schedule
+    - `leagues` → list of all leagues
+    - `h2h` → historical head-to-head
+    - `races`, `race`, `driver` → Formula 1
+    - `fights`, `fight`, `fighter` → MMA
+
+    > Each widget adapts automatically based on the selected sport.
+    # Before You Begin
+    ## Dynamic targeting
+      Some widgets, such as `games`, can dynamically open other widgets like `game`, `standings`, `player`, and more.  
+      This interaction is enabled using the `data-target-*` attributes.
+
+      These attributes allow you to define **where** the opened widget should be rendered:
+
+      - `modal` → renders the widget inside a modal.
+      - CSS selector (`#id` or `.class`) → injects the widget into a specific HTML element on the page.
+
+      These targeting options are available for:
+
+      **General sports widgets (Football, Basketball, etc.):**
+
+      - `data-target-game`
+      - `data-target-standings`
+      - `data-target-team`
+      - `data-target-player`
+      - `data-target-league`
+
+      **Formula 1 specific:**
+
+      - `data-target-race`
+      - `data-target-ranking`
+      - `data-target-driver`
+
+      **MMA specific:**
+
+      - `data-target-fight`
+      - `data-target-fighter`
+
+
+      **Target a container by ID**
+
+      ```html
+        <api-sports-widget data-type="games"></api-sports-widget>
+        
+        <div id="details"></div>
+
+        <api-sports-widget
+          data-type="config"
+          data-key="Your-Api-Key-Here"
+          data-sport="football"
+          data-target-game="#details"
+        ></api-sports-widget>
+      ```
+      **Target using modal**
+
+      ```html
+        <api-sports-widget data-type="games"></api-sports-widget>
+
+        <api-sports-widget
+          data-type="config"
+          data-key="Your-Api-Key-Here"
+          data-sport="football"
+          data-target-game="modal"
+        ></api-sports-widget>
+      ```
+    ## Language
+
+      The `data-lang` attribute allows you to easily switch the interface language of all widgets.
+
+      #### Available languages:
+
+      - `en` (English)
+      - `fr` (French)
+      - `es` (Spanish)
+      - `it` (Italian)
+
+      **Example usage**
+      ```html
+      <api-sports-widget
+        data-type="config"
+        data-key="Your-Api-Key"
+        data-sport="football"
+        data-lang="en"
+        data-custom-lang="https://yourdomain.com/lang/en.json"
+      ></api-sports-widget>
+      ```
+      > Example <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/lang.png'/>
+
+      #### Custom translations:
+      For complete control over wording, you can load your own translation file using `data-custom-lang`.  
+      This file must be a valid JSON object following the internal key structure.
+
+      You can download the translation file [here](https://widgets.api-sports.io/3.1.0/en.json).
+
+      It allows you to:
+      - Override specific labels
+      - Translate missing terms
+      - Adapt terminology to your audience
+
+      Example JSON format:
+      ```json
+      {
+        "all": "All",
+        "live": "Now Live",
+        "finished": "Completed",
+        "scheduled": "Coming Up",
+        "favorites": "Favorites",
+      }
+      ```
+
+      > You can use `data-lang` and `data-custom-lang` **together**.  
+      > If a key is defined in both, the **custom file will take priority**.
+
+      
+      **Exemple for custom translation**
+      
+      ```html
+        <api-sports-widget data-type="games" data-target-game="modal"></api-sports-widget>
+
+        <api-sports-widget
+          data-type="config"
+          data-key="Your-Api-Key-Here"
+          data-sport="football"
+          data-lang="custom"
+          data-custom-lang="https://yourdomain.com/lang/custom.json"
+        ></api-sports-widget>
+      ```
+
+      You have a tutorial available [here](https://www.api-football.com/news/post/create-a-custom-translation-file-for-your-widgets)
+
+      ## Predefined themes
+      Four built-in themes are available by default. You can set them using the `data-theme` attribute on any widget.
+
+      - `white` (default)
+      - `grey`
+      - `dark`
+      - `blue`
+
+      Each theme adjusts background colors, text colors, button styles, borders, and more.
+
+      <div style='display: flex;gap: 0.25rem;'>
+        
+      **White**  
+      <img src='https://api-sports-media-temp.b-cdn.net/widgets/white.png'/>
+      **Grey**  
+      <img src='https://api-sports-media-temp.b-cdn.net/widgets/grey.png'/>
+
+      **Dark**  
+      <img src='https://api-sports-media-temp.b-cdn.net/widgets/dark.png'/>
+      **Blue**  
+      <img src='https://api-sports-media-temp.b-cdn.net/widgets/blue.png'/>
+      </div>
+
+      ## Custom theme
+      You can override the default styles by creating your own CSS theme using the `data-theme` attribute and custom variable declarations.
+
+      Example:
+
+      ```css
+      api-sports-widget[data-theme="MyTheme"] {
+        --primary-color: #18cfc0;
+        --success-color: #2ecc58;
+        --warning-color: #f39c12;
+        --danger-color: #e74c3c;
+        --light-color: #898989;
+
+        --home-color: var(--primary-color);
+        --away-color: #ffc107;
+
+        --text-color: #333;
+        --text-color-info: #333;
+
+        --background-color: #fff;
+
+        --primary-font-size: 0.72rem;
+        --secondary-font-size: 0.75rem;
+        --button-font-size: 0.8rem;
+        --title-font-size: 0.9rem;
+
+        --header-text-transform: uppercase;
+        --button-text-transform: uppercase;
+        --title-text-transform: uppercase;
+
+        --border: 1px solid #95959530;
+        --game-height: 2.3rem;
+        --league-height: 2.35rem;
+
+        --score-size: 2.25rem;
+        --flag-size: 22px;
+        --teams-logo-size: 18px;
+        --teams-logo-size-xl: 5rem;
+        --hover: rgba(200, 200, 200, 0.15);
+      }
+      
+      ```
+
+      ```html
+          <api-sports-widget data-type="games"></api-sports-widget>
+
+          <div id="game-container"></div>
+
+          <api-sports-widget
+            data-type="config"
+            data-key="Your-Api-Key-Here"
+            data-sport="football"
+            data-theme="MyTheme"
+          ></api-sports-widget>
+      ```
+
+
+servers:
+  - url: https://widgets.api-sports.io/3.1.0
+tags:
+  - name: Customization
+    description:
+      The widgets come with a selection of predefined themes to quickly match your website’s visual identity.
+
+      However, you can also create fully custom themes using **CSS variables**, giving you full control over the look and feel of every component.
+
+paths:
+  /config:
+    get:
+      tags:
+        - Configuration
+      summary: Script & Configuration
+      description: |
+        #### Insert the script
+
+        To run our widgets, you must include this JavaScript file in your HTML page.
+
+
+        This script is necessary to load the web components used by all widgets (games, player, standings, etc.).
+        ```html
+        <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+        ```
+
+        #### Insert the configuration widget
+
+        Global settings are defined with a single configuration widget `data-type=‘config’`
+
+        This widget is required for our widgets to function and must be present on your HTML page.
+
+        It initialises the general settings (API key, sport, language, theme, etc.) for all other widgets on your page.
+
+        ```html
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+            ></api-sports-widget>
+        ```
+
+        > The configuration widget must be included only once, and all other widgets on the page will automatically inherit these settings, unless they are redefined locally.
+
+      x-code-samples:
+        - lang: Html
+          label: Example
+          source: |
+            <api-sports-widget data-type="games"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-refresh="15"
+              data-show-logos="true"
+              data-favorite="true"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+        - lang: Html
+          label: Complete example
+          source: |
+            <api-sports-widget data-type="games"></api-sports-widget>
+
+            <div id="game-container"></div>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-theme="grey"
+              data-refresh="15"
+              data-show-logos="true"
+              data-favorite="true"
+              data-tab="live"
+              data-target-game="#game-container"
+              data-target-standings="modal"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+
+      parameters:
+        - name: data-key
+          description: Your API key
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: data-sport
+          in: query
+          schema:
+            type: string
+            enum:
+              - afl
+              - baseball
+              - basketball
+              - f1
+              - football
+              - handball
+              - hockey
+              - mma
+              - nba
+              - nfl
+              - rugby
+              - volleyball
+            default: football
+        - name: data-url-[sport]
+          in: query
+          schema:
+            type: string
+          description: Custom API URL for a given sport
+        - name: data-lang
+          in: query
+          schema:
+            type: string
+            enum:
+              - en
+              - fr
+              - es
+              - it
+            default: en
+        - name: data-custom-lang
+          description: URL of a custom translation JSON file
+          in: query
+          schema:
+            type: string
+        - name: data-theme
+          in: query
+          schema:
+            type: string
+            enum:
+              - white
+              - grey
+              - dark
+              - blue
+            default: white
+        - name: data-refresh
+          in: query
+          schema:
+            pattern: " ≥15"
+            oneOf:
+              - type: string
+                enum:
+                  - "false"
+                  - "true"
+              - type: integer
+          description: Auto-refresh interval in seconds, or "true" to use the default value.
+        - name: data-timezone
+          in: query
+          schema:
+            type: string
+          description: Force a specific timezone.
+        - name: data-show-toolbar
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Show or hide the top toolbar
+        - name: data-show-logos
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Show or hide team logos.
+        - name: data-logo-url
+          in: query
+          schema:
+            type: string
+          description: Custom base URL for loading team logos.
+        - name: data-show-errors
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+            description: Display errors in the console.
+        - name: data-favorite
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+            description: Enable favorites functionality.
+        - name: data-tab
+          in: query
+          schema:
+            type: string
+            enum:
+              - all
+              - live
+              - finished
+              - scheduled
+          description: Default tab on games widget.
+        - name: data-game-tab
+          in: query
+          schema:
+            type: string
+            enum:
+              - events
+              - statistics
+              - lineups
+              - players
+          description: Default tab on game widget.
+        - name: data-team-tab
+          in: query
+          schema:
+            type: string
+            enum:
+              - venue
+              - statistics
+              - squads
+          description: Default tab on team widget.
+        - name: data-games-style
+          in: query
+          schema:
+            type: string
+            enum:
+              - "1"
+              - "2"
+            default: "1"
+          description: Match display style.
+        - name: data-team-squad
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable team squad on team widget.
+
+            *(Only available for Football, Basketball, NBA, AFL and NFL)*
+        - name: data-team-statistics
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Enable team statistics on team or game widget.
+        - name: data-player-statistics
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Enable player statistics on game widget.
+        - name: data-event
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable events on game widget.
+
+            *(Only available for Hockey, AFL and NFL)*
+        - name: data-rankings
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable or disable rankings in the widget.
+
+            *(Only available for F1)*
+        - name: data-player-trophies
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable player trophies on player widget.
+
+            *(Only available for Football)*
+        - name: data-player-injuries
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable player injuries on player widget.
+
+            *(Only available for Football)*
+        - name: data-target-game
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display game details
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+        - name: data-target-standings
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display standings
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+        - name: data-target-team
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display team details
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+        - name: data-target-player
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display player details
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+        - name: data-target-league
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display league games
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+        - name: data-target-race
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display race details
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+        - name: data-target-driver
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display driver details
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+  /games:
+    get:
+      tags:
+        - AFL
+        - Baseball
+        - Basketball
+        - Football
+        - Handball
+        - Hockey
+        - NBA
+        - NFL
+        - Rugby
+        - Volleyball
+      summary: Games
+      description:
+        "Display the list of games grouped by competition according to the parameters used.
+
+        The matches are automatically updated according to the selected frequency `data-refresh`.
+
+        > Example  <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/games.png' />"
+      parameters:
+        - name: data-date
+          in: query
+          schema:
+            type: string
+            pattern: YYYY-MM-DD
+        - name: data-league
+          in: query
+          schema:
+            type: integer
+          description: Filter games by league ID(s), using one or more values separated by dashes
+        - name: data-country
+          in: query
+          schema:
+            type: string
+          description: Filter games by country
+        - name: data-refresh
+          in: query
+          schema:
+            pattern: " ≥15"
+            oneOf:
+              - type: string
+                enum:
+                  - "false"
+                  - "true"
+              - type: integer
+          description: Auto-refresh interval in seconds, or "true" to use the default value.
+        - name: data-show-toolbar
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Show or hide the top toolbar
+        - name: data-tab
+          in: query
+          schema:
+            type: string
+            enum:
+              - all
+              - live
+              - finished
+              - scheduled
+        - name: data-games-style
+          in: query
+          schema:
+            type: string
+            enum:
+              - "1"
+              - "2"
+            default: "1"
+          description: Match display style.
+        - name: data-target-game
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display game details
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+      x-codeSamples:
+        - lang: html
+          label: HTML
+          source: |
+            <api-sports-widget data-type="games"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-refresh="60"
+              data-show-logos="true"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+        - lang: html
+          label: Example live
+          source: |
+            <api-sports-widget data-type="games"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-refresh="15"
+              data-show-logos="true"
+              data-tab="live"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+        - lang: html
+          label: Example country
+          source: |
+            <api-sports-widget data-type="games"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-refresh="60"
+              data-show-logos="true"
+              data-country="England"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+        - lang: html
+          label: Example leagues
+          source: |
+            <api-sports-widget data-type="games"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-refresh="60"
+              data-show-logos="true"
+              data-league="39-253"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /game:
+    get:
+      tags:
+        - AFL
+        - Baseball
+        - Basketball
+        - Football
+        - Handball
+        - Hockey
+        - NBA
+        - NFL
+        - Rugby
+        - Volleyball
+      summary: Game
+      description:
+        "Display full detail of a game. Except for football, you will need to enable tabs of this widget using parameters.
+
+        > Example of the widget <br>
+        <img src='https://api-sports-media-temp.b-cdn.net/widgets/game.png'/>"
+      parameters:
+        - name: data-game-id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: data-refresh
+          in: query
+          schema:
+            pattern: " ≥15"
+            oneOf:
+              - type: string
+                enum:
+                  - "false"
+                  - "true"
+              - type: integer
+          description: Auto-refresh interval in seconds, or "true" to use the default value.
+        - name: data-game-tab
+          in: query
+          schema:
+            type: string
+            enum:
+              - events
+              - statistics
+              - lineups
+              - players
+              - scores
+              - rosters
+          description: Default tab.
+        - name: data-team-statistics
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable team statistics.
+
+            *(Only available for Basketball, NBA, AFL and NFL)*
+        - name: data-player-statistics.
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable player statistics.
+
+            *(Only available for Basketball, AFL and NFL)*
+        - name: data-event
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable events.
+
+            *(Only available for Hockey, AFL and NFL)*
+        - name: data-quarters
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable quarters scores.
+
+            *(Only available for AFL)*
+        - name: data-fight-results
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable detailed fight results.
+
+            *(Only available for MMA)*
+        - name: data-statistics
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable detailed fight statistics.
+
+            *(Only available for MMA)*
+        - name: data-target-team
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display team details
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+        - name: data-target-player
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display player details
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+
+      x-codeSamples:
+        - lang: html
+          label: Basic example
+          source: |
+            <api-sports-widget data-type="game" data-game-id="1234"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-refresh="30"
+              data-show-logos="true"
+              data-game-tab="lineups"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+        - lang: html
+          label: Example with data-target
+          source: |
+            <api-sports-widget data-type="game" data-game-id="1234"></api-sports-widget>
+
+            <div id="team-container"></div>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-refresh="30"
+              data-show-logos="true"
+              data-target-team="#team-container"
+              data-target-player="modal"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /leagues:
+    get:
+      tags:
+        - Baseball
+        - Basketball
+        - Football
+        - Handball
+        - Hockey
+        - NFL
+        - Rugby
+        - Volleyball
+      summary: Leagues
+      description: "Lists all leagues for the selected sport, grouped by country, with the option to favorite countries for quick access.
+
+        > Example of the widget <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/leagues.png'/>"
+
+      x-codeSamples:
+        - lang: html
+          label: Basic example
+          source: |
+            <api-sports-widget data-type="leagues"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-favorites="true"
+              data-show-logos="true"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /league:
+    get:
+      tags:
+        - AFL
+        - Baseball
+        - Basketball
+        - Football
+        - Handball
+        - Hockey
+        - NBA
+        - NFL
+        - Rugby
+        - Volleyball
+      summary: League
+      description: "Displays the full schedule of a competition, divided into today's matches, completed matches, and upcoming matches.
+
+        > Example of the widget <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/league.png'/>"
+      parameters:
+        - name: data-league
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: data-season
+          in: query
+          description: Takes the last season by default.
+          schema:
+            type: string
+        - name: data-tab
+          in: query
+          schema:
+            type: string
+            enum:
+              - today
+              - results
+              - games
+              - standings
+        - name: data-standings
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable standings
+        - name: data-target-game
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display game details
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+      x-codeSamples:
+        - lang: html
+          label: Basic example
+          source: |
+            <api-sports-widget data-type="league" data-league="39"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-refresh="30"
+              data-show-logos="true"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+        - lang: html
+          label: Standings example
+          source: |
+            <api-sports-widget data-type="league" data-league="39"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-refresh="30"
+              data-show-logos="true"
+              data-standings="true"
+              data-tab="standings"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /team-f1:
+    get:
+      tags:
+        - F1
+      summary: Team
+      description:
+        "Show detailed information about a team.
+
+        > Example of the widget 
+        
+          
+        <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/team-f1.png'/>
+        
+        
+        "
+      parameters:
+        - name: data-team-id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: data-team-statistics
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Enable team statistics.
+        - name: data-team-squad
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable team squad.  
+
+            *(Only available for Football, Basketball, NBA, AFL and NFL)*
+        - name: data-target-player
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display player details.  
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).  
+
+            *(Only available for Football):*
+
+      x-codeSamples:
+        - lang: html
+          label: Basic example
+          source: |
+            <api-sports-widget data-type="team" data-team-id="39"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-show-logos="true"
+              data-team-squad="true"
+              data-team-statistics="true"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /team:
+    get:
+      tags:
+        - AFL
+        - Baseball
+        - Basketball
+        - Football
+        - Handball
+        - Hockey
+        - NBA
+        - NFL
+        - Rugby
+        - Volleyball
+      summary: Team
+      description:
+        "Show detailed information about a team: venue, statistics, and squad.
+
+        > Example of the widget 
+        
+          
+        <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/team.png'/>
+        
+        
+        "
+      parameters:
+        - name: data-team-id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: data-team-statistics
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Enable team statistics.
+        - name: data-team-squad
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable team squad.  
+
+            *(Only available for Football, Basketball, NBA, AFL and NFL)*
+        - name: data-target-player
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display player details.  
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).  
+
+            *(Only available for Football):*
+
+      x-codeSamples:
+        - lang: html
+          label: Basic example
+          source: |
+            <api-sports-widget data-type="team" data-team-id="39"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-show-logos="true"
+              data-team-squad="true"
+              data-team-statistics="true"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /player:
+    get:
+      tags:
+        - AFL
+        - Football
+        - NBA
+        - NFL
+      summary: Player
+      description: "Displays detailed information about a player, including personal profile, season statistics, injuries, and career trophies. It provides a clear overview of appearances, goals, ratings, and other key metrics.
+
+        > Example of the widget
+        <br> 
+        <img src='https://api-sports-media-temp.b-cdn.net/widgets/player.png'/>
+        "
+      parameters:
+        - name: data-player-id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: data-season
+          in: query
+          schema:
+            type: string
+          description: Required for AFL and NFL or to enable player injuries for Football
+        - name: data-player-statistics.
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Enable player statistics.
+        - name: data-player-trophies
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable player trophies.
+
+            *(Only available for Football)*
+        - name: data-player-injuries
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: |
+            Enable player injuries. Requires the data-season parameter.
+
+            *(Only available for Football)*
+
+      x-codeSamples:
+        - lang: html
+          label: Basic example
+          source: |
+            <api-sports-widget data-type="player" data-player-id="456"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-show-logos="true"
+              data-player-statistics="true"
+              data-player-trophies="true"
+              data-player-injuries="true"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /standings:
+    get:
+      tags:
+        - AFL
+        - Baseball
+        - Basketball
+        - Football
+        - Handball
+        - Hockey
+        - NBA
+        - NFL
+        - Rugby
+        - Volleyball
+      summary: Standings
+      description:
+        "Displays the standings of a league for a given season, including team ranks, points and forms.
+
+        > Example of the widget <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/standings.png'/>"
+      parameters:
+        - name: data-league
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: data-season
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: data-target-team
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display team details
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+      x-codeSamples:
+        - lang: html
+          label: Basic example
+          source: |
+            <api-sports-widget data-type="standings" data-league="39" data-season="2024"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-favorites="true"
+              data-target-team="modal"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /h2h:
+    get:
+      tags:
+        - AFL
+        - Baseball
+        - Basketball
+        - Football
+        - Handball
+        - Hockey
+        - NBA
+        - NFL
+        - Rugby
+        - Volleyball
+      summary: Head to Head
+      description:
+        "Display historical matches between two teams based on their IDs.
+
+        > Example of the widget <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/h2h.png'/>"
+      parameters:
+        - name: data-h2h
+          in: query
+          required: true
+          schema:
+            type: string
+            example: 33-34
+      x-codeSamples:
+        - lang: html
+          label: Basic example
+          source: |
+            <api-sports-widget data-type="h2h" data-h2h="33-34"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="football"
+              data-favorites="true"
+              data-show-logos="true"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /races:
+    get:
+      tags:
+        - F1
+      summary: Races
+      description: |
+        List of all Formula 1 races available for the selected season.
+
+        > Example of the widget  <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/races.png'/>
+      parameters:
+        - name: data-season
+          in: query
+          schema:
+            type: string
+          description: Define which season to display
+        - name: data-rankings
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Enable or disable rankings in the widget.
+        - name: data-target-race
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display race details
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+        - name: data-target-driver
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display driver details
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+      x-codeSamples:
+        - lang: html
+          label: HTML
+          source: |
+            <api-sports-widget data-type="races"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="f1"
+              data-show-logos="true"
+              data-rankings="true"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+        - lang: html
+          label: Enable race modal
+          source: |
+            <api-sports-widget data-type="races"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="f1"
+              data-show-logos="true"
+              data-target-race="modal"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+        - lang: html
+          label: Enable rankings and driver modal
+          source: |
+            <api-sports-widget data-type="races"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="f1"
+              data-show-logos="true"
+              data-rankings="true"
+              data-target-driver="modal"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /race:
+    get:
+      tags:
+        - F1
+      summary: Race
+      description: |
+        Show complete detail of a Formula 1 race: results, timings, and podium.
+        > Example of the widget  <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/race.png'/>
+      parameters:
+        - name: data-race-id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: data-rankings
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Enable or disable rankings.
+        - name: data-fastest-laps
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Enable or disable fastest laps.
+        - name: data-starting-grid
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Enable or disable starting grid.
+        - name: data-pit-stops
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Enable or disable pit stops.
+      x-codeSamples:
+        - lang: html
+          label: Rankings enabled
+          source: |
+            <api-sports-widget data-type="race" data-race-id="1234"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="f1"
+              data-show-logos="true"
+              data-tab="rankings"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+        - lang: html
+          label: Example with all datas enabled
+          source: |
+            <api-sports-widget data-type="race" data-race-id="1234"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="f1"
+              data-show-logos="true"
+              data-rankings="true"
+              data-fastest-laps="true"
+              data-pit-stops="true"
+              data-starting-grid="true"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /driver:
+    get:
+      tags:
+        - F1
+      summary: Driver
+      description: "Display stats and info about a Formula 1 driver.
+
+        > Example of the widget  <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/driver.png'/>"
+      parameters:
+        - name: data-driver-id
+          in: query
+          required: true
+          schema:
+            type: integer
+      x-codeSamples:
+        - lang: html
+          label: HTML
+          source: |
+
+            <api-sports-widget data-type="driver" data-driver-id="1234"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="f1"
+              data-show-logos="true"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /fights:
+    get:
+      tags:
+        - MMA
+      summary: Fights
+      description: |
+        Display the list of MMA fights.
+
+        The fights are automatically updated according to the selected frequency `data-refresh`.
+        > Example of the widget  <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/fights.png'/>"
+      parameters:
+        - name: data-games-style
+          in: query
+          schema:
+            type: string
+            enum:
+              - "1"
+              - "2"
+            default: "1"
+          description: Fights display style.
+        - name: data-refresh
+          in: query
+          schema:
+            pattern: " ≥15"
+            oneOf:
+              - type: string
+                enum:
+                  - "false"
+                  - "true"
+              - type: integer
+          description: Auto-refresh interval in seconds, or "true" to use the default value.
+        - name: data-show-toolbar
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          description: Show or hide the top toolbar
+        - name: data-tab
+          in: query
+          schema:
+            type: string
+            enum:
+              - all
+              - live
+              - finished
+              - scheduled
+        - name: data-target-fight
+          in: query
+          schema:
+            type: string
+          description: |
+            Enable and define where to display fight details
+
+            Can be set to `"modal"` or a CSS selector (e.g., `#details`, `.container`).
+      x-codeSamples:
+        - lang: html
+          label: Basic example
+          source: |
+            <api-sports-widget data-type="fights"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="mma"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+        - lang: html
+          label: Live
+          source: |
+            <api-sports-widget data-type="fights"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="mma"
+              data-show-logos="true"
+              data-tab="live"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+        - lang: html
+          label: Enable fight modal
+          source: |
+            <api-sports-widget data-type="fights"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="mma"
+              data-show-logos="true"
+              data-target-fight="modal"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /fight:
+    get:
+      tags:
+        - MMA
+      summary: Fight
+      description: |
+        Show complete detail of a fight: scores, statistics.
+
+        > Example of the widget 
+        <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/fight.png'/>
+        
+      parameters:
+        - name: data-fight-id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: data-fight-result
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+        - name: data-statistics
+          in: query
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+      x-codeSamples:
+        - lang: html
+          label: Fight result
+          source: |
+            <api-sports-widget data-type="fight" data-fight-id="1234"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="mma"
+              data-show-logos="true"
+              data-fight-result="true"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+        - lang: html
+          label: Enabled statistics
+          source: |
+            <api-sports-widget data-type="fight" data-fight-id="1234"></api-sports-widget>
+
+            <api-sports-widget
+              data-type="config"
+              data-key="Your-Api-Key-Here"
+              data-sport="mma"
+              data-show-logos="true"
+              data-fight-result="true"
+              data-statistics="true"
+            ></api-sports-widget>
+
+            <script type="module" src="https://widgets.api-sports.io/3.1.0/widgets.js"></script>
+  /fighter:
+    get:
+      tags:
+        - MMA
+      summary: Fighter
+      description: |
+        Display stats and info about a fighter.
+
+        > Example of the widget  <br><img src='https://api-sports-media-temp.b-cdn.net/widgets/fighter.png'/>"
+      parameters:
+        - name: data-fighter-id
+          in: query
+          required: true
+          schema:
+            type: integer
+      x-codeSamples:
+        - lang: html
+          label: HTML
+          source: <api-sports-widget data-type="driver" data-driver-id="1234"></api-sports-widget>
+
+x-tagGroups:
+  - name: Quick start
+    tags:
+      - Configuration
+  - name: Widgets
+    tags:
+      - Football
+      - AFL
+      - Baseball
+      - Basketball
+      - F1
+      - Handball
+      - Hockey
+      - MMA
+      - NBA
+      - NFL
+      - Rugby
+      - Volleyball

@@ -1,0 +1,26 @@
+{
+  "version": "ultimate_with_elo_lambda",
+  "accuracy": 0.6116504854368932,
+  "roc_auc": 0.6876475216365068,
+  "samples": 411,
+  "features_count": 11,
+  "features": [
+    "feature_max_prob",
+    "feature_total_pick_over",
+    "feature_over_under_diff",
+    "feature_home_draw_diff",
+    "prob_draw",
+    "prob_over_2_5",
+    "prob_under_2_5",
+    "prob_away",
+    "delta_elo",
+    "feature_lambda_home",
+    "feature_lambda_away"
+  ],
+  "improvements": {
+    "accuracy_vs_baseline": 11.165048543689316,
+    "roc_auc_vs_baseline": 18.764752163650677,
+    "accuracy_vs_initial": -0.034951456310683415,
+    "roc_auc_vs_initial": -0.8352478363493177
+  }
+}

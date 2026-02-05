@@ -1,0 +1,37 @@
+ODDS_MARKET_MAIN = {"1x2", "match winner", "match result", "fulltime result"}
+ODDS_MARKET_DOUBLE = {"double chance"}
+ODDS_MARKET_TOTAL = {"over/under", "over under", "total goals"}
+ODDS_MARKET_BTTS = {"both teams to score", "btts"}
+
+
+def _normalize_odds_key(market: str, label: str) -> str | None:
+    market = market.lower()
+    label = label.lower()
+    if market in ODDS_MARKET_MAIN:
+        if label in {"1", "home", "home team", "home win", "1h", "w1"}:
+            return "1"
+        if label in {"x", "draw", "d", "tie"}:
+            return "x"
+        if label in {"2", "away", "away team", "away win", "2h", "w2"}:
+            return "2"
+    if market in ODDS_MARKET_DOUBLE:
+        label = label.replace(" ", "")
+        if label in {"1x", "1/x", "1-x"}:
+            return "1x"
+        if label in {"x2", "x/2", "x-2"}:
+            return "x2"
+        if label in {"12", "1/2", "1-2"}:
+            return "12"
+    if market in ODDS_MARKET_TOTAL:
+        if "over" in label and "2.5" in label:
+            return "over_2_5"
+        if "under" in label and "2.5" in label:
+            return "under_2_5"
+    if market in ODDS_MARKET_BTTS:
+        if label in {"yes", "oui", "y"}:
+            return "btts_yes"
+        if label in {"no", "non", "n"}:
+            return "btts_no"
+    return None
+
+

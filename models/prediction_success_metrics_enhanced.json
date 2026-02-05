@@ -1,0 +1,24 @@
+{
+  "version": "enhanced",
+  "accuracy": 0.6213592233009708,
+  "roc_auc": 0.6909913453973249,
+  "samples": 411,
+  "features": [
+    "feature_home_draw_diff",
+    "feature_home_away_diff",
+    "feature_over_under_diff",
+    "feature_max_prob",
+    "feature_main_confidence_norm",
+    "feature_total_pick_over",
+    "prob_home",
+    "prob_draw",
+    "prob_away",
+    "prob_over_2_5",
+    "prob_under_2_5",
+    "main_confidence"
+  ],
+  "improvements": {
+    "accuracy_delta": 0.9359223300970831,
+    "roc_auc_delta": -0.5008654602675078
+  }
+}

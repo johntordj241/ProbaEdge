@@ -1,0 +1,35 @@
+*** Begin Patch
+*** Update File: utils/prediction_history.py
+@@
+-    for column in FLOAT_COLUMNS:
+-        df[column] = pd.to_numeric(df.get(column, pd.Series(dtype=float)), errors='coerce')
+-    engineered = [
+-        'feature_home_draw_diff',
+-        'feature_home_away_diff',
+-        'feature_over_under_diff',
+-        'feature_max_prob',
+-        'feature_main_confidence_norm',
+-        'feature_total_pick_over',
+-    ]
+-    for column in engineered:
+-        if column in df.columns and column not in ordered_columns:
+-            ordered_columns.append(column)
++    for column in FLOAT_COLUMNS:
++        df[column] = pd.to_numeric(df.get(column, pd.Series(dtype=float)), errors='coerce')
++    if 'feature_home_draw_diff' not in df.columns:
++        df['feature_home_draw_diff'] = df['prob_home'] - df['prob_draw']
++    if 'feature_home_away_diff' not in df.columns:
++        df['feature_home_away_diff'] = df['prob_home'] - df['prob_away']
++    if 'feature_over_under_diff' not in df.columns:
++        df['feature_over_under_diff'] = df['prob_over_2_5'] - df['prob_under_2_5']
++    if 'feature_max_prob' not in df.columns:
++        df['feature_max_prob'] = df[['prob_home', 'prob_draw', 'prob_away']].max(axis=1)
++    if 'feature_main_confidence_norm' not in df.columns:
++        df['feature_main_confidence_norm'] = pd.to_numeric(df.get('main_confidence', pd.Series(dtype=float)), errors='coerce') / 100.0
++    if 'feature_total_pick_over' not in df.columns:
++        df['feature_total_pick_over'] = df.get('total_pick', pd.Series(dtype=str)).str.contains('over', case=False, na=False).astype(int)
++    for column in ['feature_home_draw_diff','feature_home_away_diff','feature_over_under_diff','feature_max_prob','feature_main_confidence_norm','feature_total_pick_over']:
++        if column in df.columns and column not in ordered_columns:
++            ordered_columns.append(column)
+*** End Patch
+

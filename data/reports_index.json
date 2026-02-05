@@ -1,0 +1,11 @@
+[
+  {
+    "id": "2025-11-15",
+    "title": "Rapport d'audit Proba Edge",
+    "date": "2025-11-15",
+    "summary": "Etat des lieux modules, workflows, integrations et prerequis Social Engine.",
+    "pdf_path": "docs/reports/2025-11-15-etat-des-lieux.pdf",
+    "tags": ["audit", "etat-des-lieux", "social-engine"],
+    "author": "Codex"
+  }
+]
