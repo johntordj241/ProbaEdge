@@ -255,6 +255,10 @@ def aggregate_poisson_markets(
         "over_2_5": over_2_5,
         "btts_yes": btts_yes,
         "btts_no": 1 - btts_yes,
+        # Double chance
+        "double_chance_1X": home + draw,
+        "double_chance_X2": away + draw,
+        "double_chance_12": home + away,
     }
 
 
